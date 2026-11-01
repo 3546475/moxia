@@ -66,6 +66,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.example.moxia.R
 import org.example.moxia.ui.MainDestination
@@ -280,6 +281,9 @@ internal fun FloatingBottomBar(
     val density = LocalDensity.current
     // The bar as it is drawn, recorded so the droplet can magnify it instead of the page.
     val barBackdrop = rememberLayerBackdrop()
+    // The bead's programmed travel, so a drag can take the movement over from it. Without a handle
+    // the two writers would take turns on every frame and the bead would stutter.
+    val travelJob = remember { mutableStateOf<Job?>(null) }
 
     // Touch, hold and drag all run through one detector.
     //
@@ -295,17 +299,33 @@ internal fun FloatingBottomBar(
                 val down = awaitFirstDown(requireUnconsumed = false)
                 finger.value = down.position
                 val downOnCompose = slots.isComposeSlot(down.position.x / density.density)
-                // The bead grows on the destination that is selected right now, not under the
-                // finger: that is what lets a tap read as the selection travelling to the item that
-                // was tapped, instead of the bead appearing out of nowhere at the finger. A touch on
-                // the compose button has no destination to travel from, so the bead grows on the
-                // button itself.
-                beadX.value = if (downOnCompose) {
+                // The bead always grows on the destination that is selected right now, never under
+                // the finger: that is what makes holding, sliding and tapping all read as the
+                // selection moving away from where it was. A touch on the compose button has no
+                // destination to travel from, so the bead grows on the button itself.
+                val from = if (downOnCompose) {
                     slots.composeCenter() * density.density
                 } else {
                     slots.center(currentIndex.value.toFloat()) * density.density
                 }
+                beadX.value = from
                 hovered.value = if (downOnCompose) -1 else slotAt(down.position.x)
+                travelJob.value?.cancel()
+                // Holding a destination that is not the selected one draws the same travel a tap
+                // does, only earlier: the bead sets off while the finger is still down and is
+                // already waiting under it when the finger lifts.
+                if (!downOnCompose) {
+                    val to = slots.center(slotAt(down.position.x).toFloat()) * density.density
+                    if (abs(to - from) > 1f) {
+                        travelJob.value = scope.launch {
+                            animate(
+                                initialValue = from,
+                                targetValue = to,
+                                animationSpec = TravelSpec
+                            ) { value, _ -> beadX.value = value }
+                        }
+                    }
+                }
                 scope.launch { touch.press.animateTo(1f, PressSpring) }
                 var dragged = false
                 while (true) {
@@ -314,6 +334,9 @@ internal fun FloatingBottomBar(
                     if (!change.pressed) break
                     if (!dragged) {
                         dragged = (change.position - down.position).getDistance() > viewConfiguration.touchSlop
+                        // The finger owns the bead from here: a travel that is still running would
+                        // otherwise keep pulling it back towards the slot it was heading for.
+                        if (dragged) travelJob.value?.cancel()
                     }
                     if (dragged) {
                         // Past the slop this is a drag, and the items must not also read it as a tap.
@@ -327,6 +350,7 @@ internal fun FloatingBottomBar(
                     }
                 }
                 hovered.value = -1
+                travelJob.value?.cancel()
                 if (dragged) {
                     // A drag ends on whatever the bead was left over: the button opens the editor, a
                     // slot picks that destination. A tap was already handled by the item that owns
