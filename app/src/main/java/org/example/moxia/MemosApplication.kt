@@ -17,6 +17,7 @@ import org.example.moxia.data.DataStoreManager
 import org.example.moxia.data.sync.SyncWorkScheduler
 import org.example.moxia.di.appModule
 import org.example.moxia.di.networkModule
+import org.example.moxia.di.updateModule
 import org.example.moxia.di.viewModelModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -41,8 +42,12 @@ class MemosApplication : Application(), SingletonImageLoader.Factory {
         startKoin {
             androidLogger(org.koin.core.logger.Level.ERROR)
             androidContext(this@MemosApplication)
-            modules(appModule, networkModule, viewModelModule)
+            modules(appModule, networkModule, updateModule, viewModelModule)
         }
+
+        // Silent, throttled (24h) check that only refreshes the persisted "newer version exists"
+        // fact; it never downloads and never opens a screen.
+        org.example.moxia.data.update.UpdateHub.controller.maybeAutoCheck()
 
         registerActivityLifecycleCallbacks(object : android.app.Application.ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: android.app.Activity) =

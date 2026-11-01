@@ -17,6 +17,7 @@ import androidx.compose.material.icons.outlined.Balance
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material.icons.outlined.WavingHand
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -26,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +42,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
 import org.example.moxia.BuildConfig
 import org.example.moxia.R
+import org.example.moxia.data.update.UpdateController
+import org.example.moxia.data.update.UpdatePhase
 import org.example.moxia.ui.theme.AppListItem
 
 private data class KaomojiMessage(val text: String, val kaomoji: String)
@@ -47,7 +51,14 @@ private data class KaomojiMessage(val text: String, val kaomoji: String)
 @Suppress("LocalContextGetResourceValueCall")
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun AboutAppCard(onOpenLicenses: () -> Unit, onOpenLogs: () -> Unit, onShowSetup: () -> Unit) {
+fun AboutAppCard(
+    onOpenLicenses: () -> Unit,
+    onOpenLogs: () -> Unit,
+    onShowSetup: () -> Unit,
+    // Optional so previews and UI tests can render the card without a Koin graph; the settings
+    // screen always passes the application-scoped controller.
+    updateController: UpdateController? = null,
+) {
     val context = LocalContext.current
     val packageInfo = remember {
         try {
@@ -143,6 +154,37 @@ fun AboutAppCard(onOpenLicenses: () -> Unit, onOpenLogs: () -> Unit, onShowSetup
                             }
                         )
                 )
+
+                // Self-update lives here because this is where a user looks for it: the row both
+                // starts a check and carries the persisted "a newer version exists" hint, so the
+                // badge survives a restart instead of depending on this session's last check.
+                if (updateController != null && updateController.supported) {
+                    val updateState by updateController.state.collectAsState()
+                    val knownUpdate by updateController.knownUpdate.collectAsState()
+                    SettingsNavigationRow(
+                        title = stringResource(R.string.update_row_title),
+                        summary = knownUpdate?.let {
+                            stringResource(R.string.update_row_summary_new, it.versionName)
+                        } ?: stringResource(R.string.update_row_summary_idle),
+                        icon = Icons.Outlined.SystemUpdate,
+                        // Reopening while a download runs must show the progress, not restart it.
+                        onClick = {
+                            if (updateState.phase is UpdatePhase.Downloading) {
+                                updateController.open()
+                            } else {
+                                updateController.check()
+                            }
+                        },
+                    )
+                    if (updateState.visible) {
+                        UpdateDialog(
+                            state = updateState,
+                            onCheck = updateController::check,
+                            onDownload = updateController::downloadAndInstall,
+                            onDismiss = updateController::dismiss,
+                        )
+                    }
+                }
 
                 val repoUrl = stringResource(R.string.profile_about_repo_url)
                 val issuesUrl = stringResource(R.string.profile_about_issues_url)

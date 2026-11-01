@@ -70,6 +70,35 @@ jobs:
           cp "$OUT/app-universal-release.apk"   "release-apks/moxia-${TAG}-universal.apk"
           ls -lh release-apks
 
+      # versionCode in the manifest must be the one baked into the APKs, so read it back from the
+      # built package instead of recomputing the tag rule a second time.
+      - name: Verify the built version matches the tag
+        run: |
+          set -euo pipefail
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort | tail -n 1)
+          LINE=$("$AAPT2" dump badging release-apks/moxia-${GITHUB_REF_NAME}-arm64-v8a.apk | head -n 1)
+          CODE=$(echo "$LINE" | sed -E "s/.*versionCode='([0-9]+)'.*/\1/")
+          NAME=$(echo "$LINE" | sed -E "s/.*versionName='([^']+)'.*/\1/")
+          echo "built versionCode=$CODE versionName=$NAME"
+          test "$NAME" = "${GITHUB_REF_NAME#v}" || { echo "versionName does not match the tag"; exit 1; }
+
+      - name: Generate update.json
+        run: |
+          set -euo pipefail
+          python3 scripts/gen_update_json.py \
+            --tag "${GITHUB_REF_NAME}" \
+            --apk-dir release-apks \
+            --base-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}" \
+            --out update.json
+          # The manifest decides what every client downloads, so prove the digests describe the
+          # bytes that were just built before anything is published.
+          for abi in arm64-v8a armeabi-v7a universal; do
+            expected=$(python3 -c "import json;print(json.load(open('update.json'))['apkSha256']['$abi'])")
+            actual=$(sha256sum "release-apks/moxia-${GITHUB_REF_NAME}-${abi}.apk" | cut -d' ' -f1)
+            test "$expected" = "$actual" || { echo "digest mismatch for $abi"; exit 1; }
+          done
+          echo "manifest digests match the built packages"
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -84,7 +113,30 @@ jobs:
             | `arm64-v8a` | 64-bit ARM phones and tablets (recommended) |
             | `armeabi-v7a` | 32-bit ARM devices |
             | `universal` | any device; both ABIs in one APK, larger download |
-          files: release-apks/*.apk
+          # update.json rides along so the release is self-describing even before the mirror is updated.
+          files: |
+            release-apks/*.apk
+            update.json
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Clients read a static file, not an API. Publishing it only after the release exists keeps
+      # the manifest from ever pointing at a package that was not uploaded yet.
+      - name: Publish update.json to the repository
+        run: |
+          set -euo pipefail
+          cp update.json "$RUNNER_TEMP/update.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B manifest origin/main
+          cp "$RUNNER_TEMP/update.json" update.json
+          if git diff --quiet -- update.json; then
+            echo "manifest already current"
+            exit 0
+          fi
+          git add update.json
+          git commit -m "chore(update): publish manifest for ${GITHUB_REF_NAME}"
+          git push origin manifest:main
+

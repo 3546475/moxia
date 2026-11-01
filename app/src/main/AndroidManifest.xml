@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <!-- Self-update drives PackageInstaller.Session itself: without this, createSession/commit
+         throw SecurityException and the tap looks like it did nothing. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".MemosApplication"
@@ -108,6 +111,16 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/user_stats_widget_info" />
+        </receiver>
+
+        <!-- PackageInstaller reports the session outcome here. Not exported: the intent is built
+             by this app and handed to the system as a mutable PendingIntent. -->
+        <receiver
+            android:name=".data.update.InstallResultReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.example.moxia.action.INSTALL_STATUS" />
+            </intent-filter>
         </receiver>
 
         <!-- Serves the PNG written for "share as image"; nothing else is exposed. -->
