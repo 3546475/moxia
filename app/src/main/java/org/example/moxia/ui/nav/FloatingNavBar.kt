@@ -5,7 +5,7 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -122,13 +122,11 @@ private val SelectionWellHorizontalInset = 4.dp
 private val SelectionWellVerticalInset = 8.dp
 
 /**
- * The bead's travel between two destinations.
- *
- * A fixed duration rather than a spring: a spring at this distance is over in about a tenth of a
- * second, which reads as a jump. This one sets off immediately and takes its time arriving, so the
- * slide itself is what you see, not its two endpoints.
+ * The bead's travel between two destinations: it pulls away from rest, peaks in the middle and
+ * settles back into rest at the destination.
  */
-private val TravelSpec = tween<Float>(durationMillis = 420, easing = FastOutSlowInEasing)
+private val TravelEasing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
+private val TravelSpec = tween<Float>(durationMillis = 150, easing = TravelEasing)
 
 /** The capsule's shadow: a stack of faint rounded layers that follows the bar's fade. */
 private val CapsuleShadowSpread = 34.dp
@@ -173,8 +171,11 @@ private val CapsuleBarPadding = 6.dp
 /** Growing the droplet is a scale, not a bounce: critically damped so it does not wobble. */
 private val PressSpring = spring<Float>(dampingRatio = 1f, stiffness = 1000f)
 
-/** Letting it go is faster than growing it: the finger is already gone. */
-private val ReleaseSpec = tween<Float>(durationMillis = 160)
+/** Gone as soon as the finger is. */
+private val ReleaseSpec = tween<Float>(durationMillis = 80)
+
+/** The selection takes over as the bead leaves, at the same pace. */
+private val SelectionRevealSpec = tween<Color>(durationMillis = 80)
 
 /** The capsule grows out of the bottom edge, where it is anchored on screen. */
 private val BottomOrigin = TransformOrigin(0.5f, 1f)
@@ -781,7 +782,7 @@ private fun FloatingBarItem(
         } else {
             MiuixTheme.colorScheme.onSurfaceVariantActions
         },
-        animationSpec = tween(durationMillis = 180),
+        animationSpec = SelectionRevealSpec,
         label = "FloatingBarItemTint"
     )
     // The selected destination keeps a darker well of its own. With the glass only appearing under a
@@ -797,7 +798,7 @@ private fun FloatingBarItem(
         } else {
             Color.Transparent
         },
-        animationSpec = tween(durationMillis = 180),
+        animationSpec = SelectionRevealSpec,
         label = "FloatingBarItemWell"
     )
     // Icon only: a floating bar is narrower than the docked one, and the labels made the icons
