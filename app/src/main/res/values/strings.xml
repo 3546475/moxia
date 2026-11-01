@@ -128,9 +128,9 @@
     <string name="profile_about_git_hash">Git Hash</string>
     <string name="profile_about_version_copied">Version copied to clipboard</string>
     <string name="profile_about_repo">Source Code</string>
-    <string name="profile_about_repo_url" translatable="false">https://github.com/3546475/memos-m</string>
+    <string name="profile_about_repo_url" translatable="false">https://github.com/3546475/moxia</string>
     <string name="profile_about_issues">Report an Issue</string>
-    <string name="profile_about_issues_url" translatable="false">https://github.com/3546475/memos-m/issues</string>
+    <string name="profile_about_issues_url" translatable="false">https://github.com/3546475/moxia/issues</string>
     <string name="profile_about_git_hash_copied">Git hash copied to clipboard</string>
     <string name="profile_about_build_info">Build</string>
     <string name="profile_about_support">Help &amp; diagnostics</string>

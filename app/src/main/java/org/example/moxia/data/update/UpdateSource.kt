@@ -27,13 +27,13 @@ sealed interface UpdateSource {
 
     companion object {
         /**
-         * The shipped default. `update.json` is committed to the release branch of the CNB mirror
-         * by the release workflow; CNB is reachable from mainland China without a proxy.
+         * The shipped default: `update.json` on the CNB mirror's main branch, which the release
+         * workflow writes. CNB is reachable from mainland China without a proxy.
          */
         const val DEFAULT_MANIFEST_URL =
-            "https://cnb.cool/3546475/memos-m/-/git/raw/main/update.json"
+            "https://cnb.cool/nulxiel/moxia/-/git/raw/main/update.json"
 
-        const val GITHUB_REPO = "3546475/memos-m"
+        const val GITHUB_REPO = "3546475/moxia"
 
         /** Tried in order; the first source that answers decides. Never mixed. */
         fun defaults(): List<UpdateSource> = listOf(
