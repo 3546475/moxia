@@ -113,9 +113,16 @@ fun updateChannel(applicationId: String): String = when {
  */
 fun isSelfUpdateChannel(channel: String): Boolean = channel == "stable" || channel == "debug"
 
-/** A manifest entry for another channel is not an update for this install. */
+/**
+ * A manifest entry for another channel is not an update for this install.
+ *
+ * A debug build is the one exception: it ships the same packages as stable, so it reads the
+ * stable manifest and hands the stable build to the installer.
+ */
 fun channelMatches(remoteChannel: String?, localChannel: String): Boolean =
-    remoteChannel.isNullOrBlank() || remoteChannel == localChannel
+    remoteChannel.isNullOrBlank() ||
+        remoteChannel == localChannel ||
+        (localChannel == "debug" && remoteChannel == "stable")
 
 /**
  * Cold-start throttling: at most one automatic check per day, measured from the last *successful*

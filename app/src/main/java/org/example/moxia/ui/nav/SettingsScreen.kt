@@ -207,7 +207,6 @@ fun SettingsScreen(
                             onOpenLicenses = onOpenLicenses,
                             onShowSetup = onShowSetup,
                             onOpenLogs = { onOpenSection(SettingsSection.AUDIT) },
-                            updateController = org.example.moxia.data.update.UpdateHub.controller,
                         )
                     }
                     SettingsSection.INSTANCE -> settingsItem {

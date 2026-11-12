@@ -611,7 +611,6 @@
     <!-- Self-update (About screen). Only the stable channel offers it. -->
     <string name="update_row_title">Check for updates</string>
     <string name="update_row_summary_new">Version %1$s is available</string>
-    <string name="update_row_summary_idle">Check for a newer build</string>
     <string name="update_dialog_title">Software update</string>
     <string name="update_checking">Checking for updates…</string>
     <string name="update_available">Version %1$s is available</string>

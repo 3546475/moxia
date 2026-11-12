@@ -131,6 +131,12 @@ class UpdateInfoTest {
         assertFalse(channelMatches("insider", "stable"))
     }
 
+    @Test
+    fun `a debug build consumes the stable manifest but not the other way round`() {
+        assertTrue(channelMatches("stable", "debug"))
+        assertFalse(channelMatches("debug", "stable"))
+    }
+
     // --- throttling ------------------------------------------------------------------------
 
     @Test
