@@ -1,5 +1,6 @@
 import java.text.SimpleDateFormat
 import java.util.Date
+import org.gradle.api.tasks.testing.Test
 
 val gitShortHash: Provider<String> = providers.exec {
     commandLine("git", "rev-parse", "--short", "HEAD")
@@ -186,6 +187,19 @@ android {
         }
         named("insider") {
             res.directories.add(("src/insider/res"))
+        }
+    }
+}
+
+// The tests that boot a real Memos server through Testcontainers need a Docker daemon. A runner
+// without one cannot execute them, and a container start failure would fail the whole build for a
+// reason that has nothing to do with the package. Such a runner asks for their exclusion with
+// -PexcludeDockerTests=true.
+tasks.withType<Test>().configureEach {
+    if (providers.gradleProperty("excludeDockerTests").orNull == "true") {
+        filter {
+            excludeTestsMatching("org.example.moxia.api.MemosApiIntegrationTest")
+            excludeTestsMatching("org.example.moxia.ContainerTest")
         }
     }
 }
