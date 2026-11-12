@@ -206,7 +206,8 @@ fun SettingsScreen(
                         AboutAppCard(
                             onOpenLicenses = onOpenLicenses,
                             onShowSetup = onShowSetup,
-                            onOpenLogs = { onOpenSection(SettingsSection.AUDIT) }
+                            onOpenLogs = { onOpenSection(SettingsSection.AUDIT) },
+                            updateController = org.example.moxia.data.update.UpdateHub.controller,
                         )
                     }
                     SettingsSection.INSTANCE -> settingsItem {
