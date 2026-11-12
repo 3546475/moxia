@@ -549,6 +549,10 @@ fun MemoItem(
                             } else {
                                 Modifier
                             })) {
+                    // The text column's inset. A markdown table spends it, so the table spans the
+                    // card's content width instead of the narrower text column.
+                    val textInsetStart = 12.dp
+                    val textInsetEnd = 16.dp
                     NativeComposeMarkdown(
                         content = memo.content,
                         token = token,
@@ -558,7 +562,9 @@ fun MemoItem(
                         onHashtagClick = onHashtagClick,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 12.dp, end = 16.dp, bottom = 8.dp),
+                            .padding(start = textInsetStart, end = textInsetEnd, bottom = 8.dp),
+                        bleedStart = textInsetStart,
+                        bleedEnd = textInsetEnd,
                         headerScale = headerScale
                     )
                 }
