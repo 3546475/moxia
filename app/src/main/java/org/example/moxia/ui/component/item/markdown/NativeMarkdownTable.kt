@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -19,12 +20,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.SubcomposeLayout
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import org.intellij.markdown.ast.ASTNode
@@ -80,6 +82,11 @@ fun NativeMarkdownTable(
     val headerBackground = MaterialTheme.colorScheme.secondaryContainer
     val lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f) // Subtle lines
     val tableCornerSize = 8.dp
+    // Every second body row gets a faint tint so a long table stays scannable.
+    val zebraColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f)
+    // The host's text inset; the table spends it so it spans the card's content width.
+    val bleed = LocalMarkdownBleed.current
+    val tableBackground = MaterialTheme.colorScheme.surface
 
     val darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val styles = MarkdownStyles(
@@ -103,21 +110,39 @@ fun NativeMarkdownTable(
     // Every cell is built once here and reused by both passes below, so the table composes each
     // cell exactly once per frame; the width pass only measures the string it already has.
     val cellMatrix = remember(headerCells, rowCells, content, styles, onHashtagClick) {
-        (listOf(headerCells) + rowCells).map { row ->
+        (listOf(headerCells) + rowCells).mapIndexed { rowIndex, row ->
+            val isHeader = rowIndex == 0
             row.map { cellNode ->
                 val inlineContent = mutableMapOf<String, InlineTextContent>()
                 TableCellContent(
                     text = buildAnnotatedString {
-                        appendInlineChildren(
-                            cellNode,
-                            content,
-                            styles,
-                            context,
-                            density,
-                            fontSizePx,
-                            inlineContent,
-                            onHashtagClick
-                        )
+                        // A header row is a title row, so it reads bold even when the author left
+                        // the cells unstyled.
+                        if (isHeader) {
+                            withStyle(styles.boldStyle) {
+                                appendInlineChildren(
+                                    cellNode,
+                                    content,
+                                    styles,
+                                    context,
+                                    density,
+                                    fontSizePx,
+                                    inlineContent,
+                                    onHashtagClick
+                                )
+                            }
+                        } else {
+                            appendInlineChildren(
+                                cellNode,
+                                content,
+                                styles,
+                                context,
+                                density,
+                                fontSizePx,
+                                inlineContent,
+                                onHashtagClick
+                            )
+                        }
                     },
                     inlineContent = inlineContent
                 )
@@ -126,18 +151,29 @@ fun NativeMarkdownTable(
     }
     val textMeasurer = rememberTextMeasurer()
 
-    BoxWithConstraints(modifier = Modifier.padding(vertical = 8.dp)) {
+    val scrollState = rememberScrollState()
+    BoxWithConstraints(
+        modifier = Modifier.padding(
+            // The table spans the card's content width instead of the text column, so a wide
+            // table gets the room it needs and still lines up with the card.
+            start = -bleed.start,
+            end = -bleed.end,
+            top = 8.dp,
+            bottom = 8.dp
+        )
+    ) {
         // Allow two viewport widths per column to retain horizontal scrolling,
         // but wrap huge cells before their preferred width becomes unrepresentable.
         val maxCellWidth = with(density) { (maxWidth * 2).roundToPx() }
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(tableCornerSize))
-                .background(MaterialTheme.colorScheme.surface)
+                .background(tableBackground)
                 .border(1.dp, lineColor, RoundedCornerShape(tableCornerSize))
-                .horizontalScroll(rememberScrollState())
         ) {
-            SubcomposeLayout { constraints ->
+            SubcomposeLayout(
+                modifier = Modifier.horizontalScroll(scrollState)
+            ) { constraints ->
                 val columnWidths = IntArray(columnCount)
                 val totalPadding = tableCellPadding.roundToPx() * 2
                 val cellConstraints = Constraints(
@@ -166,10 +202,15 @@ fun NativeMarkdownTable(
                     Column {
                         cellMatrix.forEachIndexed { rowIndex, row ->
                             val isHeader = rowIndex == 0
+                            val rowBackground = when {
+                                isHeader -> headerBackground
+                                (rowIndex - 1) % 2 == 1 -> zebraColor
+                                else -> Color.Transparent
+                            }
                             Row(
                                 modifier = Modifier
                                     .width(with(density) { tableWidth.toDp() })
-                                    .background(if (isHeader) headerBackground else Color.Transparent)
+                                    .background(rowBackground)
                                     .height(IntrinsicSize.Min)
                             ) {
                                 row.forEachIndexed { columnIndex, cell ->
@@ -203,10 +244,14 @@ fun NativeMarkdownTable(
                                         }
                                         // VERTICAL LINE: Add if it's not the last column
                                         if (columnIndex < columnCount - 1) {
-                                            VerticalDivider(
-                                                modifier = Modifier.fillMaxHeight(),
-                                                thickness = 1.dp,
-                                                color = lineColor
+                                            // Miuix has no vertical divider, so the line is drawn
+                                            // from the theme's own divider colour instead of a
+                                            // Material-only component.
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(1.dp)
+                                                    .fillMaxHeight()
+                                                    .background(lineColor)
                                             )
                                         }
                                     }
@@ -228,8 +273,37 @@ fun NativeMarkdownTable(
                     contentPlaceables.forEach { it.placeRelative(0, 0) }
                 }
             }
+            // Fade the edge that still has content behind it, so a wide table reads as scrollable.
+            if (scrollState.maxValue > 0) {
+                if (scrollState.value > 0) {
+                    TableEdgeFade(Alignment.CenterStart, tableBackground)
+                }
+                if (scrollState.value < scrollState.maxValue) {
+                    TableEdgeFade(Alignment.CenterEnd, tableBackground)
+                }
+            }
         }
     }
+}
+
+/** Fades one edge of a scrollable table into the table background. */
+@Composable
+private fun BoxScope.TableEdgeFade(alignment: Alignment, color: Color) {
+    Box(
+        modifier = Modifier
+            .align(alignment)
+            .padding(horizontal = 1.dp)
+            .width(20.dp)
+            .fillMaxHeight()
+            .background(
+                Brush.horizontalGradient(
+                    when (alignment) {
+                        Alignment.CenterStart -> listOf(color, color.copy(alpha = 0f))
+                        else -> listOf(color.copy(alpha = 0f), color)
+                    }
+                )
+            )
+    )
 }
 
 fun getTableAlignments(node: ASTNode, content: String, columnCount: Int): List<TextAlign> {

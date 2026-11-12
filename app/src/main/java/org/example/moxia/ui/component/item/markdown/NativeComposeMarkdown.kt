@@ -10,12 +10,24 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 val LocalToken = compositionLocalOf { "" }
 val LocalHostUrl = compositionLocalOf { "" }
 val LocalMarkdownReferences = compositionLocalOf { emptyMap<String, String>() }
+
+/**
+ * The horizontal inset the host puts around the markdown text.
+ *
+ * A table spends it, so it spans the card's content width instead of the
+ * narrower text column.
+ */
+data class MarkdownBleed(val start: Dp, val end: Dp)
+
+val LocalMarkdownBleed = compositionLocalOf { MarkdownBleed(0.dp, 0.dp) }
 
 /**
  * Renders [content] as markdown.
@@ -34,6 +46,8 @@ fun NativeComposeMarkdown(
     hostUrl: String = "",
     selectable: Boolean = false,
     headerScale: Float,
+    bleedStart: Dp = 0.dp,
+    bleedEnd: Dp = 0.dp,
     onContentChange: ((String) -> Unit)? = null,
     onHashtagClick: ((String) -> Unit)? = null
 ) {
@@ -58,7 +72,8 @@ fun NativeComposeMarkdown(
     CompositionLocalProvider(
         LocalToken provides token,
         LocalHostUrl provides hostUrl,
-        LocalMarkdownReferences provides parsed.references
+        LocalMarkdownReferences provides parsed.references,
+        LocalMarkdownBleed provides MarkdownBleed(bleedStart, bleedEnd)
     ) {
         if (selectable) {
             SelectionContainer {
