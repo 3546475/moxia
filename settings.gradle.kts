@@ -36,7 +36,17 @@ dependencyResolutionManagement {
         }
         google()
         mavenCentral()
-        maven { url = uri("https://jitpack.io") }
+        // jitpack 上的构件只从 jitpack 取。Maven Central 对 com.github.* 记的 group 会回 429，
+        // 而 429 是致命错误：Gradle 不会再往后找 jitpack，整次依赖解析直接失败。
+        exclusiveContent {
+            forRepository {
+                maven { url = uri("https://jitpack.io") }
+            }
+            filter {
+                includeGroup("com.github.gregcockroft")
+                includeGroup("com.github.jitpack")
+            }
+        }
     }
 }
 
