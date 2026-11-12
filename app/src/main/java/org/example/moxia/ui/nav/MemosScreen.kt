@@ -96,6 +96,7 @@ import org.example.moxia.ui.component.filter.memoFilterTokens
 import org.example.moxia.ui.component.filter.sortLabel
 import org.example.moxia.model.Shortcut
 import org.example.moxia.model.MemoContentType
+import org.example.moxia.model.filter.MemoFilter
 import org.example.moxia.model.filter.MemoSort
 import org.example.moxia.model.filter.normalizeTag
 import org.example.moxia.ui.component.setting.ShortcutEditDialog
@@ -183,8 +184,15 @@ fun MemosScreen(
     val listState = if (activeFeed == MemoFeed.MEMOS) memosListState else exploreListState
     // A filter replaces the result set; keeping the old offset would land the user on an
     // arbitrary memo of the new list. Scroll first, then let the request fill it in.
+    // Only a real filter change scrolls: coming back to the feed must keep the position the
+    // user left it at, so the first composition is not treated as a change.
+    var appliedFilter by remember { mutableStateOf<MemoFilter?>(null) }
     LaunchedEffect(uiState.userMemoList.filter) {
-        memosListState.scrollToItem(0)
+        val filter = uiState.userMemoList.filter
+        if (appliedFilter != null && appliedFilter != filter) {
+            memosListState.scrollToItem(0)
+        }
+        appliedFilter = filter
     }
     val activeMemos = if (activeFeed == MemoFeed.MEMOS) {
         uiState.userMemoList.list.items
