@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "channel": "stable",
+  "versionCode": 1000000,
+  "versionName": "1.0.0",
+  "tag": "v1.0.0",
+  "publishedAt": null,
+  "releaseNotes": "Moxia v1.0.0 is available.",
+  "apkUrl": {
+    "arm64-v8a": "https://cnb.cool/nulxiel/moxia/-/releases/download/v1.0.0/moxia-v1.0.0-arm64-v8a.apk",
+    "armeabi-v7a": "https://cnb.cool/nulxiel/moxia/-/releases/download/v1.0.0/moxia-v1.0.0-armeabi-v7a.apk",
+    "universal": "https://cnb.cool/nulxiel/moxia/-/releases/download/v1.0.0/moxia-v1.0.0-universal.apk"
+  },
+  "apkSha256": {
+    "arm64-v8a": "28dae80d32ff66efef4e9062fce6e5e0c2dfa5c7b06d1d78aae281942a5d77b0",
+    "armeabi-v7a": "76f2ba9a60b45d888415e8ddfa2b22f2ef9fba697af66c4a7b1be92c39175418",
+    "universal": "3392f51b45aa050aa709f19d62ec14619e94118ec1ebaa144be21c5ed28f3d4c"
+  },
+  "apkSize": {
+    "arm64-v8a": 23339790,
+    "armeabi-v7a": 19140424,
+    "universal": 64947573
+  }
+}
