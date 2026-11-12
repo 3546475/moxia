@@ -5,9 +5,34 @@ val gitShortHash: Provider<String> = providers.exec {
     commandLine("git", "rev-parse", "--short", "HEAD")
 }.standardOutput.asText.map { it.trim() }
 
+// `latest` is force-moved onto every canary build, so without the exclusion it is usually the
+// nearest tag and would become the version of any build that asks git describe.
 val gitTag: Provider<String> = providers.exec {
-    commandLine("git", "describe", "--tags", "--abbrev=0")
+    commandLine("git", "describe", "--tags", "--abbrev=0", "--exclude", "latest")
 }.standardOutput.asText.map { it.trim() }
+
+// Up to three numeric components, an optional fourth (the `.i` insider tag) and an optional
+// `-suffix`; anything else (a moving tag, a branch name) yields null rather than a wrong version.
+fun versionCodeOf(tag: String?): Int? {
+    val raw = tag?.trim()?.removePrefix("v")?.takeIf { it.isNotEmpty() } ?: return null
+    val parts = raw.substringBefore('-').split('.')
+    if (parts.size < 3) return null
+    val major = parts[0].toIntOrNull() ?: return null
+    val minor = parts[1].toIntOrNull() ?: return null
+    val patch = parts[2].takeWhile { it.isDigit() }.toIntOrNull() ?: return null
+    if (major !in 0..99 || minor !in 0..999 || patch !in 0..999) return null
+    return major * 1_000_000 + minor * 1_000 + patch
+}
+
+// Both are resolved once so the configuration never shells out after a failure.
+val detectedTag: String? = runCatching { gitTag.get() }.getOrNull()?.takeIf { it.isNotBlank() }
+val detectedVersionName: String? = detectedTag?.removePrefix("v")?.takeIf { it.isNotEmpty() }
+val detectedVersionCode: Int? = versionCodeOf(detectedTag)
+
+// The release workflow passes the pushed tag in with -PversionName=.../-PversionCode=... so a
+// release can never disagree with its tag; a plain local build falls back to the nearest tag.
+val requestedVersionName: String? = providers.gradleProperty("versionName").orNull
+val requestedVersionCode: Int? = providers.gradleProperty("versionCode").orNull?.toIntOrNull()
 
 plugins {
     alias(libs.plugins.android.application)
@@ -29,8 +54,12 @@ android {
         applicationId = "org.example.moxia"
         minSdk = 24
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        // Play-style monotonic code derived from the tag (v1.2.3 -> 1002003). The installed base
+        // reports 1, so any tagged build can replace it; a code that did not grow would make
+        // package installs and the in-app updater silently refuse, which is why this is derived
+        // rather than hand-edited.
+        versionCode = requestedVersionCode ?: detectedVersionCode ?: 1
+        versionName = requestedVersionName ?: detectedVersionName ?: "1.0"
         buildConfigField("String", "GIT_HASH", "\"${gitShortHash.get()}\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -172,21 +201,14 @@ kotlin {
 }
 
 androidComponents {
+    // Insider pins its version name to the nearest tag, which is what its `v*.i` tags describe.
     onVariants(selector().withBuildType("insider")) { variant ->
         variant.outputs.forEach { output ->
             output.versionName.set(gitTag.map { it.removePrefix("v") })
         }
     }
-    // A release built from a tag carries that tag as its version: the release workflow passes the
-    // pushed tag in with -PversionName=..., which also avoids `git describe` picking the moving
-    // `latest` tag. A plain local assembleRelease keeps the default version.
-    providers.gradleProperty("versionName").orNull?.let { taggedVersion ->
-        onVariants(selector().withBuildType("release")) { variant ->
-            variant.outputs.forEach { output ->
-                output.versionName.set(taggedVersion)
-            }
-        }
-    }
+    // Release keeps whatever defaultConfig resolved: -PversionName from the release workflow, else
+    // the nearest tag, else "1.0". There is deliberately no second source for it here.
 }
 
 

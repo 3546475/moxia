@@ -47,7 +47,11 @@ private data class KaomojiMessage(val text: String, val kaomoji: String)
 @Suppress("LocalContextGetResourceValueCall")
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun AboutAppCard(onOpenLicenses: () -> Unit, onOpenLogs: () -> Unit, onShowSetup: () -> Unit) {
+fun AboutAppCard(
+    onOpenLicenses: () -> Unit,
+    onOpenLogs: () -> Unit,
+    onShowSetup: () -> Unit,
+) {
     val context = LocalContext.current
     val packageInfo = remember {
         try {

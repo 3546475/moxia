@@ -114,6 +114,15 @@ class DataStoreManager(
         // shrink the "what changed since the last full download" window and
         // cause updates to be skipped.
         val TEXT_SYNC_CURSOR = androidx.datastore.preferences.core.longPreferencesKey("text_sync_cursor")
+
+        // --- Self-update state ---
+        // Device-local on purpose and therefore absent from `portableKeys`: a backup restored on
+        // another device must not claim that *that* install has an update waiting, and the chosen
+        // source points at a release channel rather than at this user's data.
+        val UPDATE_SOURCE_URL = stringPreferencesKey("update_source_url")
+        val UPDATE_LAST_CHECK_AT = androidx.datastore.preferences.core.longPreferencesKey("update_last_check_at")
+        val UPDATE_KNOWN_VERSION_CODE = intPreferencesKey("update_known_version_code")
+        val UPDATE_KNOWN_VERSION_NAME = stringPreferencesKey("update_known_version_name")
     }
 
     val accounts: Flow<List<Account>> = dataStore.data
@@ -600,6 +609,57 @@ class DataStoreManager(
     suspend fun removeLastSyncTime(accountId: String) {
         editPreferences { preferences ->
             preferences.remove(lastSyncTimeKey(accountId))
+        }
+    }
+
+    // --- Self-update state ---
+    // None of these keys appear in `portableKeys`, so they never enter a backup.
+
+    val updateSourceUrl: Flow<String?> = dataStore.data
+        .map { it[UPDATE_SOURCE_URL] }
+        .distinctUntilChanged()
+
+    suspend fun saveUpdateSourceUrl(url: String?) {
+        editPreferences { preferences ->
+            if (url.isNullOrBlank()) preferences.remove(UPDATE_SOURCE_URL)
+            else preferences[UPDATE_SOURCE_URL] = url.trim()
+        }
+    }
+
+    /** The last *successful* check; a failed one leaves it untouched so the next start retries. */
+    val updateLastCheckAt: Flow<Long> = dataStore.data
+        .map { it[UPDATE_LAST_CHECK_AT] ?: 0L }
+        .distinctUntilChanged()
+
+    suspend fun saveUpdateLastCheckAt(timestamp: Long) {
+        editPreferences { preferences -> preferences[UPDATE_LAST_CHECK_AT] = timestamp }
+    }
+
+    /** "A newer build exists" as a persisted fact, or null when this install is current. */
+    val knownUpdate: Flow<org.example.moxia.data.update.KnownUpdate?> = dataStore.data
+        .map { preferences ->
+            preferences[UPDATE_KNOWN_VERSION_CODE]
+                ?.takeIf { it > 0 }
+                ?.let { code ->
+                    org.example.moxia.data.update.KnownUpdate(
+                        code,
+                        preferences[UPDATE_KNOWN_VERSION_NAME].orEmpty()
+                    )
+                }
+        }
+        .distinctUntilChanged()
+
+    suspend fun saveKnownUpdate(versionCode: Int, versionName: String) {
+        editPreferences { preferences ->
+            preferences[UPDATE_KNOWN_VERSION_CODE] = versionCode
+            preferences[UPDATE_KNOWN_VERSION_NAME] = versionName
+        }
+    }
+
+    suspend fun clearKnownUpdate() {
+        editPreferences { preferences ->
+            preferences.remove(UPDATE_KNOWN_VERSION_CODE)
+            preferences.remove(UPDATE_KNOWN_VERSION_NAME)
         }
     }
 

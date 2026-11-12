@@ -128,9 +128,9 @@
     <string name="profile_about_git_hash">Git Hash</string>
     <string name="profile_about_version_copied">Version copied to clipboard</string>
     <string name="profile_about_repo">Source Code</string>
-    <string name="profile_about_repo_url" translatable="false">https://github.com/3546475/memos-m</string>
+    <string name="profile_about_repo_url" translatable="false">https://github.com/3546475/moxia</string>
     <string name="profile_about_issues">Report an Issue</string>
-    <string name="profile_about_issues_url" translatable="false">https://github.com/3546475/memos-m/issues</string>
+    <string name="profile_about_issues_url" translatable="false">https://github.com/3546475/moxia/issues</string>
     <string name="profile_about_git_hash_copied">Git hash copied to clipboard</string>
     <string name="profile_about_build_info">Build</string>
     <string name="profile_about_support">Help &amp; diagnostics</string>
@@ -607,4 +607,28 @@
     <string name="settings_editor_wrap_lines">Wrap long code lines</string>
     <string name="settings_editor_paragraph_indent">Indent the first line</string>
     <string name="settings_editor_cjk_spacing">Space between Chinese and Latin</string>
+
+    <!-- Self-update (About screen). Only the stable channel offers it. -->
+    <string name="update_row_title">Check for updates</string>
+    <string name="update_row_summary_new">Version %1$s is available</string>
+    <string name="update_dialog_title">Software update</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_available">Version %1$s is available</string>
+    <string name="update_notes_fallback">This release has no notes.</string>
+    <string name="update_downloading">Downloading…</string>
+    <string name="update_downloading_progress">Downloading… %1$d%%</string>
+    <string name="update_up_to_date">You are on the latest version.</string>
+    <string name="update_install_submitted">The package was handed to the system installer. Tap Install there to finish.</string>
+    <string name="update_failure_network">Could not reach the update source.</string>
+    <string name="update_failure_manifest">The update source returned an unreadable manifest.</string>
+    <string name="update_failure_no_apk">This release has no package for this device.</string>
+    <string name="update_failure_download">The download failed.</string>
+    <string name="update_failure_verify">The package failed verification and was discarded.</string>
+    <string name="update_failure_install_permission">Allow Moxia to install unknown apps, then try again.</string>
+    <string name="update_failure_install">The system rejected the install.</string>
+    <string name="update_install_failed_generic">Install failed.</string>
+    <string name="update_action_later">Later</string>
+    <string name="update_action_download">Download and install</string>
+    <string name="update_action_retry">Check again</string>
+    <string name="update_action_settings">Open settings</string>
 </resources>

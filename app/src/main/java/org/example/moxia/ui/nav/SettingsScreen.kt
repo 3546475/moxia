@@ -200,7 +200,7 @@ fun SettingsScreen(
                         AboutAppCard(
                             onOpenLicenses = onOpenLicenses,
                             onShowSetup = onShowSetup,
-                            onOpenLogs = { onOpenSection(SettingsSection.AUDIT) }
+                            onOpenLogs = { onOpenSection(SettingsSection.AUDIT) },
                         )
                     }
                     SettingsSection.INSTANCE -> settingsItem {

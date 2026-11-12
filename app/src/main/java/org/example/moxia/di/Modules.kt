@@ -114,6 +114,27 @@ val networkModule = module {
     }
 }
 
+val updateModule = module {
+    // Self-update shares the app's HTTP client (proxy and TLS settings stay in one place) and its
+    // DataStore. The controller is application-scoped so a download outlives the dialog.
+    single { com.google.gson.Gson() }
+    single { org.example.moxia.data.update.UpdateFetcher(get(), get()) }
+    single {
+        org.example.moxia.data.update.UpdateRepository(
+            context = androidContext(),
+            client = get(),
+            fetcher = get(),
+            dataStore = get(),
+        )
+    }
+    single {
+        org.example.moxia.data.update.UpdateController(
+            repository = get(),
+            dataStore = get(),
+        )
+    }
+}
+
 val viewModelModule = module {
     // One instance for the whole process: the composer, the settings overlays and the main feed
     // all read and write the same lists, so an optimistic write is visible everywhere at once.

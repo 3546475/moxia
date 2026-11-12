@@ -1,0 +1,168 @@
+# CNB (cnb.cool) release pipeline for the Moxia mirror.
+#
+# The mirror builds its own packages. The APK bytes differ from the GitHub build, so the CNB
+# manifest carries its own download URLs and its own digests — the two manifests describe the same
+# release but must never be mixed field by field.
+#
+# Trigger: a version tag pushed to this repository. The tag must be vX.Y.Z; the pipeline refuses
+# anything else, because a moving tag would publish a package nobody can compare.
+#
+# Secrets come from the private repository nulxiel/moxia-secrets through `imports`:
+#   SIGNING_KEYSTORE_BASE64  release keystore, base64 encoded
+#   SIGNING_STORE_PASSWORD   keystore password
+#   SIGNING_KEY_ALIAS        key alias
+#   SIGNING_KEY_PASSWORD     key password
+#   REPO_TOKEN               token with repository-release permission — the built-in CNB_TOKEN
+#                            has none and cannot create a release
+#
+# Note: inside a `script` block, avoid long single-line double-quoted concatenations; they broke
+# the YAML parsing before. Multi-line content goes through a heredoc.
+$:
+  tag_push:
+    - docker:
+        # The Android SDK image from the CNB examples (examples/ecosystem/android-demo).
+        image: mobiledevops/android-sdk-image:34.0.1
+        # Reuse the Gradle dependency cache across builds.
+        volumes:
+          - /root/.gradle:cow
+      env:
+        # The CNB runner sits in China: the Aliyun mirrors go first, the official ones stay as a
+        # fallback (settings.gradle.kts switches on this variable).
+        MOXIA_MIRROR: "1"
+        # JDK 21 is prepared by the first stage into the mounted volume, so it survives between
+        # builds.
+        JAVA_HOME: "/root/.gradle/jdk21"
+        # UTF-8 locale: the JVM derives the file name encoding from it.
+        LANG: "C.UTF-8"
+        LC_ALL: "C.UTF-8"
+      imports:
+        - https://cnb.cool/nulxiel/moxia-secrets/-/blob/main/moxia-release-env.yml
+      stages:
+        # The build needs JDK 21 (the miuix artifacts are Java 21 byte code). Idempotent: the JDK
+        # lives in the mounted volume, so it is downloaded once.
+        - name: Prepare JDK 21
+          script: |
+            set -e
+            if [ -x /root/.gradle/jdk21/bin/java ]; then
+              /root/.gradle/jdk21/bin/java -version
+              exit 0
+            fi
+            J=$(ls -d /usr/lib/jvm/*21* 2>/dev/null | head -1 || true)
+            if [ -n "$J" ] && [ -x "$J/bin/java" ]; then
+              mkdir -p /root/.gradle
+              ln -sfn "$J" /root/.gradle/jdk21
+              /root/.gradle/jdk21/bin/java -version
+              exit 0
+            fi
+            echo "no JDK 21 in the image, downloading Temurin 21"
+            mkdir -p /root/.gradle/jdk21
+            curl -fsSL -o /tmp/jdk21.tgz "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse"
+            tar xzf /tmp/jdk21.tgz -C /root/.gradle/jdk21 --strip-components=1
+            /root/.gradle/jdk21/bin/java -version
+        # The tag is the only version source, and the script refuses anything that is not vX.Y.Z.
+        # Failing here is cheaper than publishing a package nobody can compare.
+        - name: Reject a tag that is not a version
+          script: |
+            set -e
+            VC=$(python3 scripts/gen_update_json.py --tag "$CNB_BRANCH" --print-version-code)
+            echo "tag=$CNB_BRANCH versionCode=$VC"
+        # compileSdk 37 with minor 1 needs the android-37.1 platform; the image ships 34.
+        - name: Install the SDK platform
+          script: |
+            set -e
+            yes | sdkmanager "platforms;android-37.1" > /dev/null || true
+            sdkmanager --list_installed 2>/dev/null | grep -E "android-37" || {
+              echo "platforms;android-37.1 is missing"; exit 1; }
+        - name: Build the release packages
+          script: |
+            set -e
+            VC=$(python3 scripts/gen_update_json.py --tag "$CNB_BRANCH" --print-version-code)
+            mkdir -p /root/.gradle/signing
+            printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 -d > /root/.gradle/signing/moxia-release.keystore
+            # The signing material never enters the repository: the properties file exists for this
+            # build only and is removed again right after.
+            trap 'rm -f keystore.properties' EXIT
+            printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+              "/root/.gradle/signing/moxia-release.keystore" \
+              "$SIGNING_STORE_PASSWORD" "$SIGNING_KEY_ALIAS" "$SIGNING_KEY_PASSWORD" > keystore.properties
+            chmod +x ./gradlew
+            ./gradlew :app:testDebugUnitTest --no-daemon
+            ./gradlew :app:assembleRelease --no-daemon -PversionName="${CNB_BRANCH#v}" -PversionCode="$VC"
+        # The names must match what the manifest generator expects: moxia-<tag>-<abi>.apk.
+        - name: Rename the packages
+          script: |
+            set -e
+            OUT=app/build/outputs/apk/release
+            TAG="$CNB_BRANCH"
+            mkdir -p release-apks
+            cp "$OUT/app-arm64-v8a-release.apk"   "release-apks/moxia-${TAG}-arm64-v8a.apk"
+            cp "$OUT/app-armeabi-v7a-release.apk" "release-apks/moxia-${TAG}-armeabi-v7a.apk"
+            cp "$OUT/app-universal-release.apk"   "release-apks/moxia-${TAG}-universal.apk"
+            ls -lh release-apks
+        - name: Create the CNB release
+          script: |
+            set -e
+            cat > /tmp/release.json <<EOF
+            {
+              "tag_name": "$CNB_BRANCH",
+              "name": "Moxia $CNB_BRANCH",
+              "body": "Moxia $CNB_BRANCH has been published.",
+              "make_latest": "true"
+            }
+            EOF
+            CODE=$(curl -s -o /tmp/release_response.json -w "%{http_code}" -X POST \
+              "https://api.cnb.cool/nulxiel/moxia/-/releases" \
+              -H "Authorization: Bearer $REPO_TOKEN" \
+              -H "Accept: application/vnd.cnb.api+json" \
+              -H "Content-Type: application/json" \
+              -d @/tmp/release.json)
+            echo "release create http: $CODE"
+            cat /tmp/release_response.json
+            echo
+            [ "$CODE" = "201" ] || [ "$CODE" = "200" ] || [ "$CODE" = "409" ] || exit 1
+        - name: Upload the packages
+          image: cnbcool/attachments:latest
+          settings:
+            token: "$REPO_TOKEN"
+            attachments:
+              - "./release-apks/moxia-*.apk"
+        # The client reads the manifest from the raw URL of this branch, so the manifest has to
+        # live on main — the same place the GitHub workflow publishes its own copy.
+        - name: Publish update.json to main
+          script: |
+            set -e
+            TAG="$CNB_BRANCH"
+            BASE="https://cnb.cool/nulxiel/moxia/-/releases/download/${TAG}"
+            python3 scripts/gen_update_json.py \
+              --tag "$TAG" \
+              --apk-dir release-apks \
+              --base-url "$BASE" \
+              --out update.json
+            # The manifest decides what every client downloads, so prove the digests describe the
+            # bytes that were just uploaded.
+            for abi in arm64-v8a armeabi-v7a universal; do
+              expected=$(python3 -c "import json;print(json.load(open('update.json'))['apkSha256']['$abi'])")
+              actual=$(sha256sum "release-apks/moxia-${TAG}-${abi}.apk" | cut -d' ' -f1)
+              test "$expected" = "$actual" || { echo "digest mismatch for $abi"; exit 1; }
+            done
+            # The mirror branch can move while the build runs (another release, a code sync).
+            # Re-clone and retry instead of rebasing: the manifest is the only file this build
+            # owns, so a fresh clone always yields a fast-forwardable commit.
+            SRC="$(pwd)"
+            for attempt in 1 2 3; do
+              DIR="/tmp/cnbmain-${attempt}"
+              git clone -b main "https://cnb:${REPO_TOKEN}@cnb.cool/nulxiel/moxia.git" "$DIR"
+              cp "$SRC/update.json" "$DIR/update.json"
+              cd "$DIR"
+              git config user.name "cnb-build[bot]"
+              git config user.email "cnb-build@nulxiel.moxia"
+              git add update.json
+              git commit -m "chore(update): publish manifest for ${TAG} [cnb]" || true
+              if git push origin main; then
+                echo "manifest published"
+                exit 0
+              fi
+              echo "push rejected (attempt ${attempt}), retrying against the moved branch"
+            done
+            echo "could not publish the manifest after 3 attempts"
+            exit 1
