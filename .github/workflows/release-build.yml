@@ -142,11 +142,13 @@ jobs:
           git fetch origin main
           git checkout -B manifest origin/main
           cp "$RUNNER_TEMP/update.json" update.json
-          if git diff --quiet -- update.json; then
+          # `git diff` does not see an untracked file, so the manifest is staged first and the
+          # comparison runs against the index.
+          git add update.json
+          if git diff --cached --quiet -- update.json; then
             echo "manifest already current"
             exit 0
           fi
-          git add update.json
           git commit -m "chore(update): publish manifest for ${GITHUB_REF_NAME}"
           git push origin manifest:main
 
