@@ -70,9 +70,15 @@ $:
         - name: Install the SDK platform
           script: |
             set -e
-            yes | sdkmanager "platforms;android-37.1" > /dev/null || true
-            sdkmanager --list_installed 2>/dev/null | grep -F "platforms;android-37.1" || {
-              echo "platforms;android-37.1 is missing"; exit 1; }
+            # The image ships no usable sdkmanager, so the install is best effort only:
+            # Gradle downloads the platform itself when the build needs it.
+            if command -v sdkmanager > /dev/null 2>&1; then
+              yes | sdkmanager "platforms;android-37.1" > /dev/null 2>&1 || true
+              sdkmanager --list_installed 2>/dev/null | grep -F "platforms;android-37.1" \
+                || echo "platforms;android-37.1 is not installed yet"
+            else
+              echo "sdkmanager is unavailable; the Gradle build will fetch the platform"
+            fi
         - name: Build the release packages
           script: |
             set -e
@@ -86,8 +92,31 @@ $:
               "/root/.gradle/signing/moxia-release.keystore" \
               "$SIGNING_STORE_PASSWORD" "$SIGNING_KEY_ALIAS" "$SIGNING_KEY_PASSWORD" > keystore.properties
             chmod +x ./gradlew
-            ./gradlew :app:testDebugUnitTest --no-daemon
-            ./gradlew :app:assembleRelease --no-daemon -PversionName="${CNB_BRANCH#v}" -PversionCode="$VC"
+            # The runner kills a job that prints nothing for ten minutes, and a Gradle build
+            # stays silent while it resolves and downloads dependencies, so the build runs in
+            # the background and a heartbeat keeps the log alive.
+            echo "--- repository reachability ---"
+            for URL in https://maven.aliyun.com/repository/public/ https://repo.maven.apache.org/maven2/ https://dl.google.com/dl/android/maven2/ https://jitpack.io/; do
+              CODE=$(curl -o /dev/null -s -m 25 -w '%{http_code}' "$URL" || true)
+              echo "$URL -> ${CODE:-timeout}"
+            done
+            ( ./gradlew :app:testDebugUnitTest :app:assembleRelease --no-daemon --console=plain \
+                -Dorg.gradle.internal.http.connectionTimeout=30000 \
+                -Dorg.gradle.internal.http.socketTimeout=60000 \
+                -PversionName="${CNB_BRANCH#v}" -PversionCode="$VC" ) &
+            BUILD_PID=$!
+            ELAPSED=0
+            while kill -0 "$BUILD_PID" 2>/dev/null; do
+              sleep 20
+              ELAPSED=$((ELAPSED + 20))
+              echo "still building ${CNB_BRANCH} (versionCode ${VC}), ${ELAPSED}s elapsed"
+              if [ "$ELAPSED" -ge 2700 ]; then
+                echo "the build exceeded 45 minutes"
+                kill "$BUILD_PID" || true
+                exit 1
+              fi
+            done
+            wait "$BUILD_PID"
         # The names must match what the manifest generator expects: moxia-<tag>-<abi>.apk.
         - name: Rename the packages
           script: |
