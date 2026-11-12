@@ -49,10 +49,19 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE }}" | base64 --decode > app/release.keystore
 
+      # The tag is the single source of truth for the version. Its number is resolved once here and
+      # handed to Gradle, so the package, the manifest and the release can never disagree about it.
+      - name: Resolve the version code
+        run: |
+          set -euo pipefail
+          VC=$(python3 scripts/gen_update_json.py --tag "${GITHUB_REF_NAME}" --print-version-code)
+          echo "versionCode=$VC"
+          echo "VC=$VC" >> "$GITHUB_ENV"
+
       # The tag itself drives the version name, so it does not depend on which tag `git describe`
       # happens to pick (the canary workflow moves a `latest` tag around).
       - name: Build Release APKs
-        run: ./gradlew assembleRelease -PversionName="${GITHUB_REF_NAME#v}"
+        run: ./gradlew assembleRelease -PversionName="${GITHUB_REF_NAME#v}" -PversionCode="$VC"
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/app/release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
@@ -81,6 +90,7 @@ jobs:
           NAME=$(echo "$LINE" | sed -E "s/.*versionName='([^']+)'.*/\1/")
           echo "built versionCode=$CODE versionName=$NAME"
           test "$NAME" = "${GITHUB_REF_NAME#v}" || { echo "versionName does not match the tag"; exit 1; }
+          test "$CODE" = "$VC" || { echo "versionCode $CODE does not match the tag version code $VC"; exit 1; }
 
       - name: Generate update.json
         run: |

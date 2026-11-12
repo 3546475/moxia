@@ -23,6 +23,11 @@ Usage (from the repository root, APKs already renamed into one directory):
         --notes-file release_notes.md \
         --out update.json
 
+The release pipelines need the version code *before* the build starts, because Gradle bakes it
+into the package. `--print-version-code` prints it and exits, without needing any APK:
+
+    python3 scripts/gen_update_json.py --tag v1.2.3 --print-version-code
+
 Exit codes: 0 ok, 2 bad arguments, 3 APK missing or unreadable.
 """
 from __future__ import annotations
@@ -90,7 +95,23 @@ def main() -> int:
     parser.add_argument("--notes-file", default=os.environ.get("NOTES_FILE", ""))
     parser.add_argument("--channel", default=os.environ.get("CHANNEL", "stable"))
     parser.add_argument("--out", default=os.environ.get("OUT_JSON", "update.json"))
+    parser.add_argument(
+        "--print-version-code",
+        action="store_true",
+        help="print the version code of --tag and exit, without touching any APK",
+    )
     args = parser.parse_args()
+
+    if args.print_version_code:
+        if not args.tag:
+            print("missing required argument(s): tag", file=sys.stderr)
+            return 2
+        try:
+            print(version_code(args.tag))
+        except ValueError as error:
+            print(f"cannot build manifest: {error}", file=sys.stderr)
+            return 3
+        return 0
 
     missing = [name for name in ("tag", "base_url") if not getattr(args, name)]
     if missing:

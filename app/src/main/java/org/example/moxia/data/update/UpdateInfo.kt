@@ -51,6 +51,31 @@ fun pickApk(deviceAbis: List<String>, info: UpdateInfo): ApkChoice? {
 }
 
 /**
+ * Picks the release a device should install among the manifests that answered.
+ *
+ * Two rules, applied in this order:
+ * - a manifest that belongs to another channel, is not newer than the installed build, or ships no
+ *   package this device can run is not an update at all;
+ * - among the remaining ones the highest version code wins, and a tie keeps the earlier entry:
+ *   the list is ordered by preference (CNB before GitHub), so the preferred mirror keeps the tie.
+ */
+fun selectBestUpdate(
+    candidates: List<UpdateInfo>,
+    localVersionCode: Int,
+    localChannel: String,
+    deviceAbis: List<String>,
+): UpdateInfo? {
+    var best: UpdateInfo? = null
+    for (candidate in candidates) {
+        if (candidate.versionCode <= localVersionCode) continue
+        if (!channelMatches(candidate.channel, localChannel)) continue
+        if (pickApk(deviceAbis, candidate) == null) continue
+        if (best == null || candidate.versionCode > best.versionCode) best = candidate
+    }
+    return best
+}
+
+/**
  * Version codes are derived from the release tag: `v1.2.3` -> 1002003.
  *
  * The installed base still reports versionCode 1, so any value produced by this rule is larger and

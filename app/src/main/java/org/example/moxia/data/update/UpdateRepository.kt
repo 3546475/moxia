@@ -42,46 +42,48 @@ class UpdateRepository(
     private val downloadMutex = Mutex()
 
     /**
-     * Checks every candidate source until one answers. The first *working* source decides; results
-     * from different sources are never mixed. A source that cannot be reached is not an error by
-     * itself, because the shipped defaults have a fallback order.
+     * Asks every source and keeps the best answer.
+     *
+     * The sources are independent mirrors of the same release: CNB publishes one `update.json`,
+     * GitHub another. Either may be unreachable, stale or missing, so no single source decides —
+     * the highest version code among the manifests that answered wins and a tie keeps the
+     * preferred mirror. A source that cannot be reached is not an error by itself; only when no
+     * source answers at all does the check fail.
      */
     suspend fun check(): Result<UpdateCheck> = withContext(Dispatchers.IO) {
         if (!isSelfUpdateChannel(localChannel)) return@withContext Result.success(UpdateCheck.UpToDate)
         val sources = resolveSources()
+        val answers = mutableListOf<UpdateInfo>()
         var lastFailure: UpdateException? = null
         for (source in sources) {
-            val info = try {
-                fetcher.fetch(source)
+            try {
+                answers += fetcher.fetch(source)
             } catch (e: UpdateException) {
                 lastFailure = e
-                continue
             } catch (e: IOException) {
                 lastFailure = UpdateException(UpdateFailure.NETWORK, e.message ?: "Network failed", e)
-                continue
             }
-            // Timestamp is written only here: after a source produced a readable manifest.
-            dataStore.saveUpdateLastCheckAt(now())
-            return@withContext Result.success(evaluate(info))
         }
-        Result.failure(
-            lastFailure ?: UpdateException(UpdateFailure.NETWORK, "No update source answered")
-        )
+        if (answers.isEmpty()) {
+            return@withContext Result.failure(
+                lastFailure ?: UpdateException(UpdateFailure.NETWORK, "No update source answered")
+            )
+        }
+        // Timestamp is written only here: after a source produced a readable manifest.
+        dataStore.saveUpdateLastCheckAt(now())
+        val best = selectBestUpdate(answers, localVersionCode, localChannel, deviceAbis)
+        return@withContext Result.success(evaluate(best))
     }
 
-    private suspend fun evaluate(info: UpdateInfo): UpdateCheck {
-        val choice = pickApk(deviceAbis, info)
-        val isForUs = channelMatches(info.channel, localChannel)
-        val isNewer = info.versionCode > localVersionCode
-        return if (isNewer && isForUs && choice != null) {
-            dataStore.saveKnownUpdate(info.versionCode, info.versionName ?: info.tag ?: "")
-            UpdateCheck.Available(info)
-        } else {
+    private suspend fun evaluate(best: UpdateInfo?): UpdateCheck {
+        if (best == null) {
             // Same version, another channel, or nothing this device can install: not news. Clearing
             // the stored fact is what makes the badge disappear after the user upgrades.
             dataStore.clearKnownUpdate()
-            UpdateCheck.UpToDate
+            return UpdateCheck.UpToDate
         }
+        dataStore.saveKnownUpdate(best.versionCode, best.versionName ?: best.tag ?: "")
+        return UpdateCheck.Available(best)
     }
 
     /**
