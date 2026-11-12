@@ -71,7 +71,7 @@ $:
           script: |
             set -e
             yes | sdkmanager "platforms;android-37.1" > /dev/null || true
-            sdkmanager --list_installed 2>/dev/null | grep -E "android-37" || {
+            sdkmanager --list_installed 2>/dev/null | grep -F "platforms;android-37.1" || {
               echo "platforms;android-37.1 is missing"; exit 1; }
         - name: Build the release packages
           script: |
