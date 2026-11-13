@@ -522,6 +522,10 @@
     <string name="space_revoke">取り消す</string>
     <string name="space_empty">スペースがありません</string>
     <string name="space_unsupported">このインスタンスはスペースに対応していません。</string>
+    <string name="feed_home">ホーム</string>
     <string name="space_browse">閲覧</string>
     <string name="memo_visibility_space">スペース</string>
+    <string name="memo_space_visibility_requires_space">スペース公開にはスペースが必要です</string>
+    <string name="memo_space_none">スペースなし</string>
+    <string name="memo_action_move_space">スペースに移動</string>
 </resources>

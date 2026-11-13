@@ -45,6 +45,7 @@ data class EditorRequest(
     val uris: List<String> = emptyList(),
     val visibility: Visibility = Visibility.PRIVATE,
     val location: Location? = null,
+    val space: String? = null,
     val draftId: String = draft?.id ?: UUID.randomUUID().toString(),
     val createdAt: Long = draft?.createdAt ?: System.currentTimeMillis()
 )
@@ -57,6 +58,8 @@ data class EditorSnapshot(
     val visibility: Visibility,
     val location: Location?,
     val attachments: List<EditorAttachment>,
+    /** The space this memo is placed in (`spaces/{uid}`); null on sessions written before the field existed. */
+    val space: String? = null,
     /** Names of the memos this one links to; null on sessions written before the field existed. */
     val linkedMemoNames: List<String>? = null
 )
@@ -70,13 +73,14 @@ class ComposerState(snapshot: EditorSnapshot) {
     )))
     val visibility = mutableStateOf(snapshot.visibility)
     val location = mutableStateOf(snapshot.location)
+    val space = mutableStateOf(snapshot.space)
     val attachments = mutableStateOf(snapshot.attachments.map { Uri.parse(it.uri) to it.attachment })
     val linkedMemoNames = mutableStateOf(snapshot.linkedMemoNames.orEmpty())
 
     fun snapshot() = EditorSnapshot(content.value.text, content.value.selection.start,
         content.value.selection.end, visibility.value, location.value,
         attachments.value.map { EditorAttachment(it.first.toString(), it.second) },
-        linkedMemoNames = linkedMemoNames.value)
+        linkedMemoNames = linkedMemoNames.value, space = space.value)
 }
 
 /** Saves outlive the activity, so system Back can finish without intercepting its gesture. */
@@ -104,7 +108,7 @@ object EditorSessionStore {
         write(id, StoredEditorSession(request, EditorSnapshot(text, text.length, text.length,
             request.memo?.visibility ?: request.draft?.visibility ?: request.parentMemo?.visibility ?: request.visibility,
             request.memo?.location ?: request.draft?.location ?: request.location, attachments,
-            linkedMemoNames = existingLinks)))
+            linkedMemoNames = existingLinks, space = request.memo?.space ?: request.draft?.space ?: request.space)))
         id
     }
 
@@ -143,7 +147,7 @@ object EditorSessionStore {
                                 val draft = Draft(id = session.request.draftId, content = snapshot.text,
                                     visibility = snapshot.visibility, location = snapshot.location,
                                     attachments = snapshot.attachments.mapNotNull { it.attachment },
-                                    createdAt = session.createdAt)
+                                    space = snapshot.space, createdAt = session.createdAt)
                                 if (draft.hasContent()) GlobalContext.get().get<DraftManager>()
                                     .saveDraft(session.request.accountId, draft, strict = true)
                             }

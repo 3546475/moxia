@@ -10,4 +10,8 @@
         <item>五</item>
         <item>六</item>
     </string-array>
+    <string name="feed_home">主页</string>
+    <string name="memo_space_visibility_requires_space">空间可见性需要选择空间</string>
+    <string name="memo_space_none">不属于空间</string>
+    <string name="memo_action_move_space">移动到空间</string>
 </resources>

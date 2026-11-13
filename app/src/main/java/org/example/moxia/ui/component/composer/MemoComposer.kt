@@ -70,6 +70,7 @@ import org.example.moxia.data.uriToBase64Attachment
 import org.example.moxia.model.Attachment
 import org.example.moxia.model.Location
 import org.example.moxia.model.Memo
+import org.example.moxia.model.Space
 import org.example.moxia.ui.component.item.markdown.plainLabel
 import org.example.moxia.model.Visibility
 import org.example.moxia.ui.findActivity
@@ -95,7 +96,7 @@ enum class ComposerMode {
 @Composable
 fun MemoComposer(
     modifier: Modifier = Modifier,
-    onPublish: (String, Visibility, List<Attachment>, Location?) -> Unit,
+    onPublish: (String, Visibility, List<Attachment>, Location?, String?) -> Unit,
     onUploadFile: suspend (Uri, Context) -> Attachment?,
     /** Queue a pending file for background upload and return its placeholder right away. */
     onQueueUpload: suspend (Uri, Context) -> Attachment?,
@@ -109,6 +110,8 @@ fun MemoComposer(
     editorState: ComposerState,
     /** The user's own memos, for the "link memo" picker. */
     linkableMemos: List<Memo> = emptyList(),
+    /** The spaces the account belongs to; empty hides the space picker. */
+    spaces: List<Space> = emptyList(),
     onDiscardQueuedUpload: (String) -> Unit = {}
 
 ) {
@@ -123,6 +126,7 @@ fun MemoComposer(
 
     var contentState by editorState.content
     var visibility by editorState.visibility
+    var space by editorState.space
     var location by editorState.location
     var draftAttachments by editorState.attachments
 
@@ -321,6 +325,9 @@ fun MemoComposer(
             location = location,
             isPosting = isPosting,
             visibility = visibility,
+            // A comment has no placement of its own. It inherits the memo it answers.
+            spaces = if (mode == ComposerMode.COMMENT) emptyList() else spaces,
+            space = space,
             mode = mode,
             componentWidth = componentWidth,
             pickerLauncher = pickerLauncher,
@@ -331,7 +338,21 @@ fun MemoComposer(
             onRemoveLocation = { location = null },
             onLocationClick = { showLocationEditDialog = true },
             onLinkMemoClick = { showLinkPicker = true },
-            onVisibilityChange = { visibility = it },
+            // A placement is what makes SPACE visibility meaningful, so the two move together.
+            onSpaceChange = { selected ->
+                space = selected
+                if (selected != null) {
+                    visibility = Visibility.SPACE
+                } else if (visibility == Visibility.SPACE) {
+                    visibility = Visibility.PRIVATE
+                }
+            },
+            onVisibilityChange = {
+                visibility = it
+                if (it != Visibility.SPACE) {
+                    space = null
+                }
+            },
             onRemoveAttachment = { index ->
                 if (index in draftAttachments.indices) {
                     val removed = draftAttachments[index].second
@@ -395,7 +416,7 @@ fun MemoComposer(
                         }
                         queued
                     }
-                    onPublish(contentState.text, visibility, finalAttachments, location)
+                    onPublish(contentState.text, visibility, finalAttachments, location, space)
                 }
             })
     }

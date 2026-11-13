@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,12 +15,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,15 +41,21 @@ import org.example.moxia.ui.component.ActionSheet
 
 /**
  * The single header entry that replaced the notes/explore tab row: it names the feed the list is
- * showing and opens the switcher. One entry instead of a tab row is also what makes spaces fit: a
- * space is a scope of the notes feed, not another pager page.
+ * showing, marks it with the same glyph as the switcher's rows, and opens the switcher. One entry
+ * instead of a tab row is also what makes spaces fit: a space is a scope of the notes feed, not
+ * another pager page.
  */
 @Composable
 internal fun FeedSwitcher(
-    label: String,
+    feed: MemoFeed,
+    space: Space?,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val label = when {
+        feed == MemoFeed.EXPLORE -> stringResource(R.string.nav_explore)
+        else -> space?.title ?: stringResource(R.string.feed_home)
+    }
     val interaction = remember { MutableInteractionSource() }
     Row(
         modifier = modifier
@@ -64,6 +71,19 @@ internal fun FeedSwitcher(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
+        when {
+            feed == MemoFeed.EXPLORE -> Icon(
+                imageVector = Icons.Outlined.Explore,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            space != null -> SpaceGlyph(space)
+            else -> Icon(
+                imageVector = Icons.Outlined.Home,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+        }
         Text(
             text = label,
             style = MaterialTheme.typography.titleMedium,
@@ -87,6 +107,8 @@ internal fun FeedSwitcher(
 internal fun FeedSwitcherSheet(
     activeFeed: MemoFeed,
     spaces: SpaceState,
+    /** The space the notes feed is currently scoped to, i.e. what the filter queries. */
+    selectedSpace: String?,
     onSelectFeed: (MemoFeed) -> Unit,
     onSelectSpace: (String?) -> Unit,
     onCreateSpace: () -> Unit,
@@ -96,9 +118,9 @@ internal fun FeedSwitcherSheet(
     ActionSheet(onDismissRequest = onDismiss) {
         SwitcherSectionTitle(stringResource(R.string.space_browse))
         SwitcherRow(
-            title = stringResource(R.string.nav_memos),
-            selected = activeFeed == MemoFeed.MEMOS && spaces.selected == null,
-            leading = { Icon(Icons.AutoMirrored.Outlined.Notes, contentDescription = null) },
+            title = stringResource(R.string.feed_home),
+            selected = activeFeed == MemoFeed.MEMOS && selectedSpace == null,
+            leading = { Icon(Icons.Outlined.Home, contentDescription = null) },
             onClick = {
                 onSelectFeed(MemoFeed.MEMOS)
                 onSelectSpace(null)
@@ -120,7 +142,7 @@ internal fun FeedSwitcherSheet(
                     } else {
                         null
                     },
-                    selected = activeFeed == MemoFeed.MEMOS && spaces.selected == space.name,
+                    selected = activeFeed == MemoFeed.MEMOS && selectedSpace == space.name,
                     leading = { SpaceGlyph(space) },
                     onClick = {
                         onSelectFeed(MemoFeed.MEMOS)
@@ -236,5 +258,43 @@ private fun SwitcherActionRow(
             color = MaterialTheme.colorScheme.primary,
             maxLines = 1
         )
+    }
+}
+
+/** Picks the space a memo sits in; [selected] is the memo's current placement, null for none. */
+@Composable
+internal fun MemoSpacePickerSheet(
+    spaces: List<Space>,
+    selected: String?,
+    onSelect: (String?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ActionSheet(onDismissRequest = onDismiss) {
+        SwitcherSectionTitle(stringResource(R.string.memo_action_move_space))
+        SwitcherRow(
+            title = stringResource(R.string.memo_space_none),
+            selected = selected == null,
+            leading = { Spacer(Modifier.size(24.dp)) },
+            onClick = {
+                onSelect(null)
+                onDismiss()
+            }
+        )
+        spaces.forEach { space ->
+            SwitcherRow(
+                title = space.title,
+                summary = if (space.memberCount > 0) {
+                    stringResource(R.string.space_member_count, space.memberCount)
+                } else {
+                    null
+                },
+                selected = selected == space.name,
+                leading = { SpaceGlyph(space) },
+                onClick = {
+                    onSelect(space.name)
+                    onDismiss()
+                }
+            )
+        }
     }
 }

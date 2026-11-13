@@ -9,7 +9,7 @@
     <string name="login_button">登入</string>
 
     <string name="nav_memos">筆記</string>
-    <string name="nav_explore">探索</string>
+    <string name="nav_explore">發現</string>
     <string name="nav_attachments">資源</string>
     <string name="nav_profile">我的</string>
 
@@ -573,6 +573,7 @@
     <string name="settings_editor_wrap_lines">程式碼自動換行</string>
     <string name="settings_editor_paragraph_indent">首行縮排</string>
     <string name="settings_editor_cjk_spacing">中文與英數之間加空格</string>
+    <string name="feed_home">主頁</string>
     <string name="space_title">空間</string>
     <string name="space_manage">管理空間</string>
     <string name="space_create">新增空間</string>
@@ -598,4 +599,7 @@
     <string name="space_unsupported">此實例不支援空間。</string>
     <string name="space_browse">瀏覽</string>
     <string name="memo_visibility_space">空間內可見</string>
+    <string name="memo_space_visibility_requires_space">空間可見性需要選擇空間</string>
+    <string name="memo_space_none">不屬於空間</string>
+    <string name="memo_action_move_space">移至空間</string>
 </resources>

@@ -477,6 +477,10 @@
     <string name="space_revoke">Wycofaj</string>
     <string name="space_empty">Brak przestrzeni</string>
     <string name="space_unsupported">Ta instancja nie obsługuje przestrzeni.</string>
+    <string name="feed_home">Główna</string>
     <string name="space_browse">Przeglądaj</string>
     <string name="memo_visibility_space">Przestrzeń</string>
+    <string name="memo_space_visibility_requires_space">Widoczność w przestrzeni wymaga przestrzeni</string>
+    <string name="memo_space_none">Bez przestrzeni</string>
+    <string name="memo_action_move_space">Przenieś do przestrzeni</string>
 </resources>

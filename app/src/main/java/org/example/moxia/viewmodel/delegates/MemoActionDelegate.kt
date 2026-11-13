@@ -71,7 +71,9 @@ interface MemoActionDelegate {
         onError: () -> Unit = {},
         onSuccess: () -> Unit = {},
         /** Memos the new memo links to (the composer's "link memo" action). */
-        linkedMemoNames: List<String> = emptyList()
+        linkedMemoNames: List<String> = emptyList(),
+        /** The space the memo is placed in (`spaces/{uid}`); null leaves it unassigned. */
+        space: String? = null
     )
 
     fun updateMemo(
@@ -84,11 +86,24 @@ interface MemoActionDelegate {
         onError: () -> Unit = {},
         onSuccess: () -> Unit = {},
         /** Outgoing links to store; null leaves the server's relation list untouched. */
-        linkedMemoNames: List<String>? = null
+        linkedMemoNames: List<String>? = null,
+        /** The space the memo is placed in; defaults to the memo's current placement. */
+        space: String? = memo.space
     )
 
     fun deleteMemo(memo: Memo, onSuccess: () -> Unit = {})
     fun updateMemoPinned(memo: Memo, pinned: Boolean, onSuccess: () -> Unit = {})
+
+    /**
+     * Places [memo] in [space], or takes it out of its space when [space] is null. The visibility
+     * follows the placement: a memo in a space is a SPACE memo, and nothing else can be.
+     */
+    fun moveMemoToSpace(
+        memo: Memo,
+        space: String?,
+        onError: () -> Unit = {},
+        onSuccess: () -> Unit = {}
+    )
 
     /** Drops one outgoing "link memo" relation, leaving the memo's other relations alone. */
     fun removeMemoLink(memo: Memo, targetName: String)
@@ -136,6 +151,19 @@ class MemoActionDelegateImpl(
     /** True when the failure is connectivity-related and safe to queue offline. */
     private fun shouldQueueOffline(context: AccountContext, e: Exception): Boolean =
         e is IOException || (accountSession.isCurrent(context) && !isOnlineProvider())
+
+    /**
+     * A space placement and SPACE visibility go together: the server rejects either half
+     * alone, so the write is stopped before the round trip.
+     */
+    private fun rejectsSpaceVisibility(context: AccountContext, visibility: Visibility, space: String?): Boolean {
+        if (visibility != Visibility.SPACE || space != null) return false
+        Log.e("MemosViewModel", "SPACE visibility requires a space")
+        accountSession.update(uiState, context) {
+            it.copy(error = UiMessage(R.string.memo_space_visibility_requires_space))
+        }
+        return true
+    }
 
     /** Keep the upstream UI error localized while retaining a diagnostic log. */
     private fun reportOperationFailure(context: AccountContext, e: Exception) {
@@ -252,9 +280,14 @@ class MemoActionDelegateImpl(
         memoId: String?,
         onError: () -> Unit,
         onSuccess: () -> Unit,
-        linkedMemoNames: List<String>
+        linkedMemoNames: List<String>,
+        space: String?
     ) {
         val context = accountSession.current ?: return
+        if (rejectsSpaceVisibility(context, visibility, space)) {
+            onError()
+            return
+        }
         val connection = context.connection
         val wasOnline = connection.networkReady && isOnlineProvider()
         val draftIdToDelete = uiState.value.draft.currentEditingDraftId
@@ -266,7 +299,8 @@ class MemoActionDelegateImpl(
             content = content,
             visibility = visibility,
             attachments = attachments,
-            location = location
+            location = location,
+            space = space
         )
         scope.launch {
             runCreate(context, memo, clientId, draftIdToDelete, onError, onSuccess, linkedMemoNames, wasOnline)
@@ -383,9 +417,14 @@ class MemoActionDelegateImpl(
         state: MemoState?,
         onError: () -> Unit,
         onSuccess: () -> Unit,
-        linkedMemoNames: List<String>?
+        linkedMemoNames: List<String>?,
+        space: String?
     ) {
         val context = accountSession.current ?: return
+        if (rejectsSpaceVisibility(context, visibility, space)) {
+            onError()
+            return
+        }
         val connection = context.connection
         val api = connection.api
         val wasOnline = connection.networkReady && isOnlineProvider()
@@ -396,11 +435,17 @@ class MemoActionDelegateImpl(
             visibility = visibility,
             attachments = attachments,
             location = location,
-            state = state
+            state = state,
+            space = space
         )
         val maskParts = mutableListOf("content", "visibility", "attachments", "location")
         if (state != null) {
             maskParts.add("state")
+        }
+        // The space is only touched when the placement really changes: mentioning it for an
+        // unchanged memo would clear the placement of every inline edit.
+        if (memo.space != space) {
+            maskParts.add("space")
         }
         val mask = maskParts.joinToString(",")
         val pendingOp = PendingOp.new(
@@ -576,6 +621,27 @@ class MemoActionDelegateImpl(
                 }
             }
         }
+    }
+
+    override fun moveMemoToSpace(memo: Memo, space: String?, onError: () -> Unit, onSuccess: () -> Unit) {
+        if (memo.space == space) return
+        // A placement is only valid on a SPACE memo and a SPACE memo is only valid inside a space,
+        // so the visibility follows the placement instead of being picked separately.
+        val visibility = when {
+            space != null -> Visibility.SPACE
+            memo.visibility == Visibility.SPACE -> Visibility.PRIVATE
+            else -> memo.visibility
+        }
+        updateMemo(
+            memo = memo,
+            content = memo.content,
+            visibility = visibility,
+            attachments = memo.attachments.orEmpty(),
+            location = memo.location,
+            onError = onError,
+            onSuccess = onSuccess,
+            space = space
+        )
     }
 
     override fun createComment(parentMemo: Memo, content: String, onError: () -> Unit, onSuccess: () -> Unit) {

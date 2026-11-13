@@ -23,7 +23,8 @@ interface DraftDelegate {
         visibility: Visibility,
         attachments: List<Attachment>,
         location: Location? = null,
-        draftId: String? = null
+        draftId: String? = null,
+        space: String? = null
     )
 
     fun deleteDraft(draftId: String)
@@ -73,7 +74,8 @@ class DraftDelegateImpl(
         visibility: Visibility,
         attachments: List<Attachment>,
         location: Location?,
-        draftId: String?
+        draftId: String?,
+        space: String?
     ) {
         val context = accountSession.current ?: return
         val accountId = context.account.id
@@ -85,6 +87,7 @@ class DraftDelegateImpl(
             visibility = visibility,
             attachments = attachments,
             location = location,
+            space = space,
             createdAt = if (existingDraftId != null) {
                 uiState.value.draft.drafts.find { it.id == existingDraftId }?.createdAt
                     ?: System.currentTimeMillis()
@@ -173,6 +176,7 @@ class DraftDelegateImpl(
                 visibility = draft.visibility,
                 attachments = draft.attachments.ifEmpty { null },
                 location = draft.location,
+                space = draft.space,
                 memoId = memoId,
                 onError = { cont.resume(false) },
                 onSuccess = { cont.resume(true) }

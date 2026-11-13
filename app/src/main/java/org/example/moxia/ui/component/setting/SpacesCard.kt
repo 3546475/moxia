@@ -4,15 +4,20 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,6 +27,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,9 +43,11 @@ import org.example.moxia.ui.component.ActionSheet
 import org.example.moxia.ui.nav.SpaceGlyph
 import org.example.moxia.ui.theme.AppButton
 import org.example.moxia.ui.theme.AppDialog
+import org.example.moxia.ui.theme.AppDropdownMenu
 import org.example.moxia.ui.theme.AppListItem
 import org.example.moxia.ui.theme.AppTextButton
 import org.example.moxia.ui.theme.AppTextField
+import org.example.moxia.ui.theme.AppTextFieldShape
 
 /**
  * Space management: the list, the create/edit dialogs, and the per-space sheet that edits the
@@ -186,7 +195,14 @@ private fun SpaceEditorDialog(
         title = title,
         onDismissRequest = onDismiss,
         buttons = {
-            AppTextButton(text = stringResource(R.string.common_cancel), onClick = onDismiss)
+            // Saving is the one action that carries the accent; cancelling stays the quiet fill.
+            AppButton(
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
+                secondary = true
+            ) {
+                Text(stringResource(R.string.common_cancel))
+            }
             AppButton(
                 onClick = onConfirm,
                 enabled = initialTitle.isNotBlank(),
@@ -196,31 +212,107 @@ private fun SpaceEditorDialog(
             }
         }
     ) {
-        AppTextField(
-            value = initialTitle,
-            onValueChange = onTitleChange,
-            label = stringResource(R.string.space_name),
-            singleLine = true
-        )
-        AppTextField(
-            value = initialDescription,
-            onValueChange = onDescriptionChange,
-            label = stringResource(R.string.space_description),
-            minLines = 2
-        )
-        AppTextField(
-            value = initialIcon,
-            onValueChange = onIconChange,
-            label = stringResource(R.string.space_icon),
-            placeholder = "💻",
-            singleLine = true
-        )
-        if (error != null) {
-            Text(
-                text = error,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SpaceIconButton(value = initialIcon, onValueChange = onIconChange)
+                AppTextField(
+                    value = initialTitle,
+                    onValueChange = onTitleChange,
+                    label = stringResource(R.string.space_name),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            AppTextField(
+                value = initialDescription,
+                onValueChange = onDescriptionChange,
+                label = stringResource(R.string.space_description),
+                minLines = 2
             )
+            if (error != null) {
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+/** The emoji a space is marked with, in the order people reach for them. */
+private val SpaceIconChoices = listOf(
+    "🏠", "💻", "📚", "🎨", "🎵", "🎮", "🍀", "🌱",
+    "🔥", "⭐", "☕", "🐱", "🎧", "📷", "🏀", "✈️"
+)
+
+/**
+ * The space's icon where the name field ends: a square showing what the list will draw, opening the
+ * emoji grid right where it stands, so the choice never costs the name its width.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SpaceIconButton(
+    value: String,
+    onValueChange: (String) -> Unit,
+    enabled: Boolean = true
+) {
+    val emoji = value.trim()
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Surface(
+            onClick = { expanded = true },
+            enabled = enabled,
+            shape = AppTextFieldShape(),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                .compositeOver(MaterialTheme.colorScheme.surface),
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(56.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                if (emoji.isEmpty()) {
+                    Icon(Icons.Outlined.Groups, contentDescription = null)
+                } else {
+                    Text(emoji, style = MaterialTheme.typography.headlineSmall)
+                }
+            }
+        }
+        AppDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            FlowRow(
+                modifier = Modifier.widthIn(max = 264.dp).padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                SpaceIconChoices.forEach { choice ->
+                    val selected = emoji == choice
+                    Surface(
+                        onClick = {
+                            onValueChange(if (selected) "" else choice)
+                            expanded = false
+                        },
+                        shape = CircleShape,
+                        color = if (selected) {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        } else {
+                            Color.Transparent
+                        },
+                        contentColor = if (selected) {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(choice, style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -272,27 +364,34 @@ private fun SpaceDetailSheet(
             }
         }
 
-        Column(Modifier.padding(horizontal = 20.dp)) {
-            AppTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = stringResource(R.string.space_name),
-                singleLine = true,
-                enabled = isAdmin
-            )
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SpaceIconButton(
+                    value = icon,
+                    onValueChange = { icon = it },
+                    enabled = isAdmin
+                )
+                AppTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = stringResource(R.string.space_name),
+                    singleLine = true,
+                    enabled = isAdmin,
+                    modifier = Modifier.weight(1f)
+                )
+            }
             AppTextField(
                 value = description,
                 onValueChange = { description = it },
                 label = stringResource(R.string.space_description),
                 minLines = 2,
-                enabled = isAdmin
-            )
-            AppTextField(
-                value = icon,
-                onValueChange = { icon = it },
-                label = stringResource(R.string.space_icon),
-                placeholder = "💻",
-                singleLine = true,
                 enabled = isAdmin
             )
             if (dirty && isAdmin) {
@@ -358,7 +457,10 @@ private fun SpaceDetailSheet(
 
         if (isAdmin) {
             GroupLabel(stringResource(R.string.space_invitations))
-            Column(Modifier.padding(horizontal = 20.dp)) {
+            Column(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 AppTextField(
                     value = invitee,
                     onValueChange = { invitee = it },

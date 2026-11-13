@@ -76,7 +76,7 @@ fun MemoComposerScreen(
                         modifier = Modifier.padding(8.dp))
                 }
                 MemoComposer(
-                    onPublish = { content, visibility, attachments, location ->
+                    onPublish = { content, visibility, attachments, location, space ->
                         scope.launch {
                             if (!editorSession.beginSubmission()) return@launch
                             val failed: () -> Unit = {
@@ -89,12 +89,14 @@ fun MemoComposerScreen(
                             when {
                                 initialMemo != null -> viewModel.memoActionDelegate.updateMemo(
                                     initialMemo, content, visibility, attachments, location,
+                                    space = space,
                                     linkedMemoNames = editorSession.state.linkedMemoNames.value,
                                     onError = failed, onSuccess = onSubmitted)
                                 parentMemo != null -> viewModel.memoActionDelegate.createComment(
                                     parentMemo, content, onError = failed, onSuccess = onSubmitted)
                                 else -> viewModel.memoActionDelegate.createMemo(content, visibility,
                                     attachments, location,
+                                    space = space,
                                     memoId = java.util.UUID.nameUUIDFromBytes(editorSession.request.draftId.toByteArray()).toString(),
                                     linkedMemoNames = editorSession.state.linkedMemoNames.value,
                                     onError = failed, onSuccess = onSubmitted)
@@ -113,6 +115,7 @@ fun MemoComposerScreen(
                     isPosting = uiState.isPosting || editorSession.busy,
                     editorState = editorSession.state,
                     linkableMemos = uiState.userMemoList.list.items,
+                    spaces = uiState.space.spaces,
                     mode = mode,
                     modifier = Modifier
                         .weight(1f)

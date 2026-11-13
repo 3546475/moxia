@@ -521,6 +521,10 @@
     <string name="space_revoke">Zurückziehen</string>
     <string name="space_empty">Noch keine Bereiche</string>
     <string name="space_unsupported">Diese Instanz unterstützt keine Bereiche.</string>
+    <string name="feed_home">Start</string>
     <string name="space_browse">Durchsuchen</string>
     <string name="memo_visibility_space">Bereich</string>
+    <string name="memo_space_visibility_requires_space">Sichtbarkeit „Space“ erfordert einen Space</string>
+    <string name="memo_space_none">Kein Space</string>
+    <string name="memo_action_move_space">In einen Bereich verschieben</string>
 </resources>

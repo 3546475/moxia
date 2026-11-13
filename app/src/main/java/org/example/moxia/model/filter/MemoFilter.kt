@@ -24,6 +24,12 @@ data class MemoFilter(
     val tagMatch: TagMatch = TagMatch.ALL,
     val date: MemoDateRange? = null,
     val types: Set<MemoContentType> = emptySet(),
+    /**
+     * The space this feed is scoped to (`spaces/{uid}`), or null for no scope: the feed then shows
+     * everything the account can see, every space included. A scope says where the user is
+     * browsing, so it is not one of the conditions the filter panel collects.
+     */
+    val space: String? = null,
     /** Ordering of the feed; not a filter condition, but stored and cleared with it. */
     val sort: MemoSort = MemoSort.PINNED_DESC
 ) {
@@ -128,5 +134,6 @@ fun MemoFilter.matches(memo: Memo): Boolean {
         if (created == null || !range.contains(created)) return false
     }
     if (types.isNotEmpty() && types.none { memo.matchesContentType(it) }) return false
+    space?.let { if (memo.space != it) return false }
     return true
 }

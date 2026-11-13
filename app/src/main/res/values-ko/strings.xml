@@ -521,6 +521,10 @@
     <string name="space_revoke">취소</string>
     <string name="space_empty">스페이스가 없습니다</string>
     <string name="space_unsupported">이 인스턴스는 스페이스를 지원하지 않습니다.</string>
+    <string name="feed_home">홈</string>
     <string name="space_browse">둘러보기</string>
     <string name="memo_visibility_space">스페이스</string>
+    <string name="memo_space_visibility_requires_space">공간 공개에는 공간이 필요합니다</string>
+    <string name="memo_space_none">공간 없음</string>
+    <string name="memo_action_move_space">스페이스로 이동</string>
 </resources>

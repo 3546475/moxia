@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -33,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.ArrowDropUp
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Close
@@ -82,6 +84,7 @@ import org.example.moxia.ui.theme.AppFloatingActionButton
 import org.example.moxia.ui.theme.MiuixTokens
 import org.example.moxia.model.Attachment
 import org.example.moxia.model.Location
+import org.example.moxia.model.Space
 import org.example.moxia.model.Visibility
 import org.example.moxia.ui.VisibilityIcon
 import org.example.moxia.ui.component.item.AttachmentCard
@@ -105,6 +108,10 @@ fun MemoComposerBottomBar(
     hostUrl: String,
     contentStateText: String,
     isUploadingCount: Int,
+    /** The spaces the account belongs to; empty hides the space picker. */
+    spaces: List<Space> = emptyList(),
+    /** The space the memo is placed in (`spaces/{uid}`), or null for no placement. */
+    space: String? = null,
 
     onRemoveLocation: () -> Unit,
     onLocationClick: () -> Unit,
@@ -114,10 +121,12 @@ fun MemoComposerBottomBar(
     onRecordingFinished: (Uri, Attachment?) -> Unit,
     onLocationFounded: (Location) -> Unit,
     onLinkMemoClick: () -> Unit = {},
+    onSpaceChange: (String?) -> Unit = {},
 ) {
     LocalContext.current
     var showActionOverflowMenu by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
+    var spaceExpanded by remember { mutableStateOf(false) }
 
     val showVisibilityLabel = componentWidth > 480.dp || componentWidth == 0.dp
     val showPublishLabel = componentWidth > 410.dp || componentWidth == 0.dp
@@ -524,7 +533,10 @@ fun MemoComposerBottomBar(
                                 properties = PopupProperties(focusable = false),
                                 offset = DpOffset(0.dp, 48.dp)
                             ) {
-                                Visibility.entries.filter { it != Visibility.VISIBILITY_UNSPECIFIED }
+                                Visibility.entries.filter {
+                                    it != Visibility.VISIBILITY_UNSPECIFIED &&
+                                        (it != Visibility.SPACE || spaces.isNotEmpty())
+                                }
                                     .forEach { option ->
                                         DropdownMenuItem(text = {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -541,6 +553,72 @@ fun MemoComposerBottomBar(
                                             expanded = false
                                         })
                                     }
+                            }
+                        }
+                    }
+
+                    // Space Dropdown: a placement and SPACE visibility move together.
+                    if (spaces.isNotEmpty()) {
+                        val selectedSpace = spaces.firstOrNull { it.name == space }
+                        Box {
+                            TextButton(
+                                onClick = { spaceExpanded = true },
+                                enabled = !isPosting,
+                                contentPadding = if (isCompact) PaddingValues(horizontal = 8.dp) else ButtonDefaults.TextButtonContentPadding,
+                                modifier = if (isCompact) Modifier.height(actionButtonSize) else Modifier
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Groups,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                if (showVisibilityLabel) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = selectedSpace?.title
+                                            ?: stringResource(R.string.memo_space_none),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.widthIn(max = 160.dp)
+                                    )
+                                    Icon(
+                                        imageVector = if (spaceExpanded) Icons.Outlined.ArrowDropUp else Icons.Outlined.ArrowDropDown,
+                                        contentDescription = null
+                                    )
+                                }
+                            }
+                            DropdownMenu(
+                                expanded = spaceExpanded,
+                                onDismissRequest = { spaceExpanded = false },
+                                properties = PopupProperties(focusable = false),
+                                offset = DpOffset(0.dp, 48.dp)
+                            ) {
+                                DropdownMenuItem(text = {
+                                    Text(text = stringResource(R.string.memo_space_none))
+                                }, onClick = {
+                                    onSpaceChange(null)
+                                    spaceExpanded = false
+                                })
+                                spaces.forEach { item ->
+                                    DropdownMenuItem(text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Groups,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = item.title,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }, onClick = {
+                                        onSpaceChange(item.name)
+                                        spaceExpanded = false
+                                    })
+                                }
                             }
                         }
                     }

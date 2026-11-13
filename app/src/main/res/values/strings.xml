@@ -655,6 +655,10 @@
     <string name="space_revoke">Revoke</string>
     <string name="space_empty">No spaces yet</string>
     <string name="space_unsupported">This instance does not support spaces.</string>
+    <string name="feed_home">Home</string>
     <string name="space_browse">Browse</string>
     <string name="memo_visibility_space">Space</string>
+    <string name="memo_space_visibility_requires_space">Space visibility needs a space</string>
+    <string name="memo_space_none">No space</string>
+    <string name="memo_action_move_space">Move to space</string>
 </resources>

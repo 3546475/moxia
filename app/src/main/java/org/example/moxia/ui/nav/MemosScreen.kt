@@ -102,6 +102,7 @@ import org.example.moxia.model.filter.normalizeTag
 import org.example.moxia.ui.component.setting.ShortcutEditDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import org.example.moxia.model.Memo
+import org.example.moxia.model.Visibility
 import org.example.moxia.ui.component.GenericMemosListPane
 import org.example.moxia.ui.component.MemoSearchBar
 import org.example.moxia.ui.component.MemosScaffold
@@ -210,15 +211,15 @@ fun MemosScreen(
     var showFilterPanel by remember { mutableStateOf(false) }
     // The header entry that replaced the tab row: it opens the feed/space switcher.
     var showFeedSwitcher by remember { mutableStateOf(false) }
-    val feedSwitcherLabel = if (activeFeed == MemoFeed.EXPLORE) {
-        stringResource(R.string.nav_explore)
-    } else {
-        uiState.space.selectedSpace?.title ?: stringResource(R.string.nav_memos)
+    val feedFilter = uiState.userMemoList.filter
+    // The filter owns the scope, so the header names the space it queries instead of a memory
+    // of one: restoring a session cannot leave the title and the feed disagreeing.
+    val scopeSpace = feedFilter.space?.let { name ->
+        uiState.space.spaces.firstOrNull { it.name == name }
     }
     // Non-null when the "save as view" dialog is open, carrying the compiled filter expression.
     var creatingViewCel by remember { mutableStateOf<String?>(null) }
     var editingShortcut by remember { mutableStateOf<Shortcut?>(null) }
-    val feedFilter = uiState.userMemoList.filter
     val feedFilterActive = feedFilter.isActive
     // Explore has no filter model yet, so the entry only exists on the notes feed.
     val feedFilterAvailable = activeFeed == MemoFeed.MEMOS
@@ -241,15 +242,23 @@ fun MemosScreen(
     )
     // Tag suggestions come from both sources: the profile stats know tags the feed has not loaded
     // yet, and the loaded feed knows tags the stats snapshot may be missing (offline, new notes).
-    val tagCounts = remember(uiState.session.userStats?.tagCount, uiState.userMemoList.list.items) {
-        val fromStats = uiState.session.userStats?.tagCount.orEmpty()
-            .mapKeys { (tag, _) -> normalizeTag(tag) }
+    // Inside a space only what the space itself has is offered: the stats cover the whole account.
+    val feedSpace = feedFilter.space
+    val tagCounts = remember(
+        feedSpace, uiState.session.userStats?.tagCount, uiState.userMemoList.list.items
+    ) {
+        val fromStats: Map<String, Int> = if (feedSpace == null) {
+            uiState.session.userStats?.tagCount.orEmpty()
+        } else {
+            emptyMap()
+        }
+        val normalizedStats = fromStats.mapKeys { (tag, _) -> normalizeTag(tag) }
         val fromFeed = uiState.userMemoList.list.items
             .flatMap { it.tags.orEmpty() }
             .groupingBy { tag -> normalizeTag(tag) }
             .eachCount()
-        (fromStats.keys + fromFeed.keys).associateWith { tag ->
-            maxOf(fromStats[tag] ?: 0, fromFeed[tag] ?: 0)
+        (normalizedStats.keys + fromFeed.keys).associateWith { tag ->
+            maxOf(normalizedStats[tag] ?: 0, fromFeed[tag] ?: 0)
         }
     }
     val filterTokens = remember(
@@ -296,8 +305,13 @@ fun MemosScreen(
     }
     val composeNew: () -> Unit = {
         uiState.accounts.firstOrNull { it.isActive }?.let { account ->
+            // The feed's scope is the placement the user is looking at, so a memo written from a
+            // space lands in it. SPACE visibility is the only one a placement is valid with.
+            val space = feedFilter.space
             openEditor(EditorRequest(account.id, titleRes = R.string.memo_composer_fab_new_memo,
-                visibility = uiState.session.userSettings?.memoVisibility ?: org.example.moxia.model.Visibility.PRIVATE))
+                visibility = if (space != null) Visibility.SPACE
+                else uiState.session.userSettings?.memoVisibility ?: Visibility.PRIVATE,
+                space = space))
         }
     }
     var showDraftPrompt by remember { mutableStateOf(false) }
@@ -455,7 +469,8 @@ fun MemosScreen(
                         ) {
                             AnimatedVisibility(visible = tabsVisible) {
                                 FeedSwitcher(
-                                    label = feedSwitcherLabel,
+                                    feed = activeFeed,
+                                    space = scopeSpace,
                                     modifier = Modifier.testTag("memo_feed_tabs"),
                                     onClick = { showFeedSwitcher = true }
                                 )
@@ -507,7 +522,8 @@ fun MemosScreen(
                     ) {
                         Row(Modifier.fillMaxWidth().padding(start = 10.dp)) {
                             FeedSwitcher(
-                                label = feedSwitcherLabel,
+                                feed = activeFeed,
+                                space = scopeSpace,
                                 modifier = Modifier
                                     .testTag("memo_feed_tabs")
                                     .onSizeChanged {
@@ -745,7 +761,7 @@ fun MemosScreen(
         onDismiss = { showFilterPanel = false },
         onApply = { filter ->
             showFilterPanel = false
-            viewModel.filterDelegate.apply(filter)
+            viewModel.applyFilter(filter)
         },
         onManageShortcuts = {
             showFilterPanel = false
@@ -769,6 +785,7 @@ fun MemosScreen(
         FeedSwitcherSheet(
             activeFeed = activeFeed,
             spaces = uiState.space,
+            selectedSpace = feedFilter.space,
             onSelectFeed = { feed ->
                 showFeedSwitcher = false
                 pagerScope.launch {
@@ -971,6 +988,7 @@ private fun MemosListPane(
         indicatorTopPadding = indicatorTopPadding,
         errorTitle = stringResource(R.string.common_error_failed_to_load_memos),
         onHashtagClick = onHashtagClick,
+        spaces = uiState.space.spaces,
         emptyState = emptyState,
         showSkeleton = !uiState.userMemoList.list.initialLoadFinished,
         onPlaceholdersLifted = onFeedSettled,

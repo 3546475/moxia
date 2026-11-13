@@ -51,6 +51,7 @@ import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -115,6 +116,7 @@ import org.example.moxia.model.Memo
 import org.example.moxia.model.MemoRelationType
 import org.example.moxia.model.MemoState
 import org.example.moxia.model.Reaction
+import org.example.moxia.model.Space
 import org.example.moxia.model.User
 import org.example.moxia.ui.VisibilityIcon
 import org.example.moxia.ui.component.LocalMemoEditGesture
@@ -125,6 +127,8 @@ import org.example.moxia.ui.component.item.media.AttachmentOrigins
 import org.example.moxia.ui.component.item.media.attachmentOrigin
 import org.example.moxia.ui.component.item.media.FullScreenAttachmentViewer
 import org.example.moxia.ui.component.resolveResourceUrl
+import org.example.moxia.ui.nav.MemoSpacePickerSheet
+import org.example.moxia.ui.nav.SpaceGlyph
 
 
 /**
@@ -170,9 +174,14 @@ fun MemoItem(
     isDetailView: Boolean = false,
     reactionOptions: List<String> = emptyList(),
     headerScale: Float,
-    onHashtagClick: ((String) -> Unit)? = null
+    onHashtagClick: ((String) -> Unit)? = null,
+    /** Spaces the memo can be moved into; empty hides the action. */
+    spaces: List<Space> = emptyList(),
+    /** Moves the memo to the given space, or out of its space when null. */
+    onMoveToSpace: ((String?) -> Unit)? = null
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    var showSpacePicker by remember { mutableStateOf(false) }
     var showReactionPicker by remember { mutableStateOf(false) }
     // The card is recorded into a layer only while a share is being prepared, so scrolling a long
     // list does not pay for an offscreen pass on every frame.
@@ -513,7 +522,13 @@ fun MemoItem(
                                 onPin = onPin,
                                 onArchive = onArchive,
                                 onUnarchive = onUnarchive,
-                                onDelete = onDelete
+                                onDelete = onDelete,
+                                spaces = spaces,
+                                onMoveToSpace = if (onMoveToSpace != null && spaces.isNotEmpty()) {
+                                    { showSpacePicker = true }
+                                } else {
+                                    null
+                                }
                             )
                         }
                     }
@@ -821,6 +836,15 @@ fun MemoItem(
         )
     }
 
+    if (showSpacePicker && onMoveToSpace != null) {
+        MemoSpacePickerSheet(
+            spaces = spaces,
+            selected = memo.space,
+            onSelect = onMoveToSpace,
+            onDismiss = { showSpacePicker = false }
+        )
+    }
+
     if (showFullScreenViewer) {
         val attachments = remember(memo.attachments) { memo.attachments ?: emptyList() }
         FullScreenAttachmentViewer(
@@ -850,7 +874,9 @@ private fun MemoActionsMenu(
     onPin: ((Boolean) -> Unit)?,
     onArchive: (() -> Unit)?,
     onUnarchive: (() -> Unit)?,
-    onDelete: (() -> Unit)?
+    onDelete: (() -> Unit)?,
+    spaces: List<Space>,
+    onMoveToSpace: (() -> Unit)?
 ) {
     if (!expanded) return
     AppDropdownMenu(expanded = true, onDismissRequest = onDismissRequest) {
@@ -891,6 +917,23 @@ private fun MemoActionsMenu(
                         contentDescription = null,
                         tint = if (isPinned) MaterialTheme.colorScheme.primary else LocalContentColor.current
                     )
+                }
+            )
+        }
+        if (onMoveToSpace != null) {
+            val placedIn = spaces.firstOrNull { it.name == memo.space }
+            AppDropdownMenuItem(
+                text = stringResource(R.string.memo_action_move_space),
+                onClick = {
+                    onDismissRequest()
+                    onMoveToSpace()
+                },
+                leadingIcon = {
+                    if (placedIn != null) {
+                        SpaceGlyph(placedIn)
+                    } else {
+                        Icon(Icons.Outlined.Groups, contentDescription = null)
+                    }
                 }
             )
         }

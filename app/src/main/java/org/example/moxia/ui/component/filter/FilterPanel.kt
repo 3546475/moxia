@@ -243,8 +243,10 @@ fun FilterPanel(
         buttons = {
             // Applying is the one action that carries the accent; reset stays a quiet secondary
             // fill. As two equal text buttons neither of them read as the primary action.
+            // The space is where the feed is scoped, not a condition: resetting the conditions
+            // leaves the user inside the space they are browsing.
             AppButton(
-                onClick = { draft = MemoFilter() },
+                onClick = { draft = MemoFilter(space = filter.space) },
                 modifier = Modifier.weight(1f),
                 secondary = true
             ) {

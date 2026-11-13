@@ -9,7 +9,7 @@
     <string name="login_button">登录</string>
 
     <string name="nav_memos">笔记</string>
-    <string name="nav_explore">探索</string>
+    <string name="nav_explore">发现</string>
     <string name="nav_attachments">资源</string>
     <string name="nav_profile">我的</string>
 
@@ -635,6 +635,7 @@
     <string name="update_action_download">下载并安装</string>
     <string name="update_action_retry">重新检查</string>
     <string name="update_action_settings">去设置</string>
+    <string name="feed_home">主页</string>
     <string name="space_title">空间</string>
     <string name="space_manage">管理空间</string>
     <string name="space_create">新建空间</string>
@@ -660,4 +661,7 @@
     <string name="space_unsupported">该实例不支持空间。</string>
     <string name="space_browse">浏览</string>
     <string name="memo_visibility_space">空间内可见</string>
+    <string name="memo_space_visibility_requires_space">空间可见性需要选择空间</string>
+    <string name="memo_space_none">不属于空间</string>
+    <string name="memo_action_move_space">移动到空间</string>
 </resources>

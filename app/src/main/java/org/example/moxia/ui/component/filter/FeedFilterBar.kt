@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Link
@@ -69,7 +70,8 @@ data class FeedFilterToken(
  * Turns the structured filter into the summary bar's tokens. [view] is the saved view the filter
  * was built from, when it is still in the shortcut list; [fallbackLabel] covers a persisted view
  * that the server no longer returns. [dateLabel], [sortLabel] and [typeLabels] are what the UI can
- * render: null (or a missing entry) simply omits that token.
+ * render: null (or a missing entry) simply omits that token. The space the feed is scoped to is
+ * named by the header switcher, so it is not repeated in the summary bar.
  */
 fun memoFilterTokens(
     filter: MemoFilter,

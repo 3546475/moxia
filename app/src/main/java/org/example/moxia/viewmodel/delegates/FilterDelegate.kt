@@ -52,7 +52,11 @@ class FilterDelegateImpl(
         apply(if (name in current.tags) current.withoutTag(name) else current.withTag(name))
     }
 
-    override fun clear() = apply(MemoFilter())
+    /**
+     * Drops every condition; the space scope is where the user is browsing, not a condition, so
+     * they stay inside the space they were in.
+     */
+    override fun clear() = apply(MemoFilter(space = uiState.value.userMemoList.filter.space))
 
     /**
      * Persist into the session snapshot next to the shortcuts, so the feed reopens with the same

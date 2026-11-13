@@ -100,6 +100,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.example.moxia.R
 import org.example.moxia.model.Memo
+import org.example.moxia.model.Space
 import org.example.moxia.model.MemoState
 import org.example.moxia.model.User
 import org.example.moxia.model.EditGesture
@@ -581,7 +582,8 @@ fun MemosScaffold(
         indicatorTopPadding: Dp = 0.dp,
         errorTitle: String = stringResource(R.string.common_error_failed_to_load),
         onHashtagClick: ((String) -> Unit)? = null,
-        /** Shown instead of a blank pane when the server returned nothing and no page is pending. */
+        /** Spaces a card can be moved into; empty hides that menu entry. */
+        spaces: List<Space> = emptyList(),
         emptyState: (@Composable () -> Unit)? = null,
         /**
          * True until the first page (or its failure) has been applied. An empty feed then shows
@@ -730,7 +732,8 @@ fun MemosScaffold(
                                 reactionOptions = reactionOptions,
                                 user = userProvider(memo),
                                 onClick = { onMemoClick(memo) },
-                                onHashtagClick = onHashtagClick
+                                onHashtagClick = onHashtagClick,
+                                spaces = spaces
                             )
                         }
                     }
@@ -782,7 +785,8 @@ fun MemoPreviewItem(
     user: User? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    onHashtagClick: ((String) -> Unit)? = null
+    onHashtagClick: ((String) -> Unit)? = null,
+    spaces: List<Space> = emptyList()
 ) {
     val focusManager = LocalFocusManager.current
     val onEditMemo = LocalMemoEditor.current
@@ -836,6 +840,16 @@ fun MemoPreviewItem(
         onDelete = if (isOwner) {
             { showDelete = true }
         } else null,
+        onMoveToSpace = if (isOwner) { space ->
+            // A space-scoped feed shows the server's result set, so a memo that just left or
+            // entered the scope only disappears or appears on the next page fetch.
+            viewModel.memoActionDelegate.moveMemoToSpace(
+                memo,
+                space,
+                onSuccess = { viewModel.fetchUserMemos(refresh = true) }
+            )
+        } else null,
+        spaces = spaces,
         onUpsertReaction = { emoji ->
             viewModel.memoActionDelegate.upsertMemoReaction(memo, emoji)
         },

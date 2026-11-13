@@ -14,6 +14,7 @@ fun MemoFilter.toCel(creatorFilter: String? = null): String? {
         tagClause()?.let(::add)
         date?.toCelClause()?.let(::add)
         typesClause()?.let(::add)
+        spaceClause()?.let(::add)
     }
     return clauses.joinToString(" && ").takeIf { it.isNotBlank() }
 }
@@ -66,6 +67,15 @@ private fun MemoContentType.toCelClause(): String = when (this) {
     MemoContentType.LINK -> "has_link"
     MemoContentType.TODO -> "has_task_list"
     MemoContentType.CODE -> "content.contains(${celString("`")})"
+}
+
+/**
+ * The space clause. The server only accepts a non-negated equality on `space`, so a feed can be
+ * scoped to one space but never to "every space but this one".
+ */
+private fun MemoFilter.spaceClause(): String? {
+    val target = space?.takeIf { it.isNotBlank() } ?: return null
+    return "space == ${celString(target)}"
 }
 
 /**

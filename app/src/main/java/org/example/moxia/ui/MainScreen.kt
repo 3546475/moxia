@@ -643,12 +643,17 @@ private fun MainScreenContent(
                         onDestination = { handleDestinationClick(it) },
                         onCompose = {
                             uiState.accounts.firstOrNull { it.isActive }?.let { account ->
+                                // Same rule as the feed's own compose button: a memo written while a
+                                // space is scoped goes into that space.
+                                val space = uiState.userMemoList.filter.space
                                 openEditor(
                                     EditorRequest(
                                         account.id,
                                         titleRes = R.string.memo_composer_fab_new_memo,
-                                        visibility = uiState.session.userSettings?.memoVisibility
-                                            ?: Visibility.PRIVATE
+                                        visibility = if (space != null) Visibility.SPACE
+                                        else uiState.session.userSettings?.memoVisibility
+                                            ?: Visibility.PRIVATE,
+                                        space = space
                                     )
                                 )
                             }

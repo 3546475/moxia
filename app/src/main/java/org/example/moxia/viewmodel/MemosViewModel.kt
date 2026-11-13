@@ -81,7 +81,7 @@ import org.example.moxia.viewmodel.manager.ServerReachabilityMonitor
 import org.example.moxia.viewmodel.manager.UserMemoListManager
 import org.example.moxia.viewmodel.manager.USER_MEMO_COMPARATOR
 import org.example.moxia.model.UserNotification
-import org.example.moxia.model.filter.celString
+import org.example.moxia.model.filter.MemoFilter
 import org.example.moxia.model.filter.matches
 import org.example.moxia.model.filter.toCel
 
@@ -142,16 +142,15 @@ class MemosViewModel(
         apiProvider = { api },
         filterProvider = {
             val state = _uiState.value
-            val space = state.space.selected
+            val filter = state.userMemoList.filter
             val creator = api?.buildMemoCreatorFilter(state.session.currUser)
             // A space is a shared area: its feed lists every member's memos, so the creator
-            // clause only applies to the unscoped feed.
-            val base = state.userMemoList.filter.toCel(if (space == null) creator else null)
-            if (space == null) base
-            else listOfNotNull(base, "space == ${celString(space)}").joinToString(" && ")
+            // clause only applies to the unscoped feed. The space clause itself comes from the
+            // filter, which is the one place that knows which space the feed is scoped to.
+            filter.toCel(if (filter.space == null) creator else null)
         },
         localFilterProvider = { _uiState.value.userMemoList.filter },
-        spaceProvider = { _uiState.value.space.selected },
+        spaceProvider = { _uiState.value.userMemoList.filter.space },
         sortProvider = { _uiState.value.userMemoList.filter.sort },
         pageSizeProvider = { _uiState.value.appSettings.pageSize },
         cacheCallbacks = CacheCallbacks(onFetchSuccess = { memos ->
@@ -447,20 +446,19 @@ class MemosViewModel(
      * shows memos the header no longer names.
      */
     fun selectSpace(space: String?) {
-        spaceManager.select(space) {
-            val applied = space
-            userMemoManager.updateState { state ->
-                state.copy(
-                    showingCached = false,
-                    items = state.items.filter { memo -> applied == null || memo.space == applied }
-                )
-            }
-            if (_uiState.value.isOnline) {
-                userMemoManager.fetch(refresh = true)
-            } else {
-                userMemoManager.loadFromCache()
-            }
+        // Switching the feed's scope leaves the conditions alone and pushes the query, the cache
+        // filter and the scroll reset through the same path as a filter change; remembering the
+        // selection keeps it across restarts.
+        spaceManager.select(space) {}
+        filterDelegate.apply(_uiState.value.userMemoList.filter.copy(space = space))
+    }
+
+    /** Applies [filter] and keeps the remembered space scope in step with it. */
+    fun applyFilter(filter: MemoFilter) {
+        if (filter.space != _uiState.value.space.selected) {
+            spaceManager.select(filter.space) {}
         }
+        filterDelegate.apply(filter)
     }
 
 

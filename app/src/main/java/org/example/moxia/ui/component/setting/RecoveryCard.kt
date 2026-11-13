@@ -135,7 +135,7 @@ fun RecoveryCard(importOnly: Boolean = false) {
                                                 val memo = GsonProvider.gson.fromJson(payload, Memo::class.java)
                                                 val draftId = "restored-${edit.get("id").asString}"
                                                 drafts.replaceDrafts(accountId, drafts.getDrafts(accountId).filterNot { it.id == draftId } + Draft(id = draftId, content = memo.content,
-                                                    visibility = memo.visibility, attachments = memo.attachments.orEmpty(), location = memo.location))
+                                                    visibility = memo.visibility, attachments = memo.attachments.orEmpty(), location = memo.location, space = memo.space))
                                                 settings.dismissRestoredEdit(accountId, edit.get("id").asString)
                                                 message = savedDraft
                                             } catch (error: Exception) { message = error.message }

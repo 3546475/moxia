@@ -71,6 +71,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -95,6 +96,7 @@ import top.yukonga.miuix.kmp.basic.Surface as MiuixSurface
 import top.yukonga.miuix.kmp.basic.Switch as MiuixSwitch
 import top.yukonga.miuix.kmp.basic.TextButton as MiuixTextButton
 import top.yukonga.miuix.kmp.basic.TextField as MiuixTextField
+import top.yukonga.miuix.kmp.basic.TextFieldDefaults as MiuixTextFieldDefaults
 import top.yukonga.miuix.kmp.basic.TopAppBar as MiuixTopAppBar
 import top.yukonga.miuix.kmp.window.WindowDialog as MiuixWindowDialog
 import top.yukonga.miuix.kmp.window.WindowListPopup as MiuixWindowListPopup
@@ -464,6 +466,14 @@ fun AppDialog(
         )
     }
 }
+
+/**
+ * The corner shape a text field draws with. A control standing beside one matches it so the pair
+ * reads as one row instead of two boxes.
+ */
+@Composable
+fun AppTextFieldShape(): Shape =
+    if (usesMiuix) RoundedCornerShape(MiuixTextFieldDefaults.CornerRadius) else MaterialTheme.shapes.extraSmall
 
 /** A Miuix text button; the Material branch keeps the familiar [TextButton]. */
 @Composable

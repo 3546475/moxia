@@ -121,6 +121,7 @@ class DraftManager(private val context: Context) {
             var visibility = Visibility.PRIVATE
             var attachments = mutableListOf<Attachment>()
             var location: Location? = null
+            var space: String? = null
             var createdAt = System.currentTimeMillis()
             var updatedAt = System.currentTimeMillis()
 
@@ -148,6 +149,12 @@ class DraftManager(private val context: Context) {
                     }
 
                     "location" -> location = parseLocation(reader, strict)
+                    "space" -> space = if (reader.peek() == JsonToken.NULL) {
+                        reader.nextNull()
+                        null
+                    } else {
+                        reader.nextString()
+                    }
                     "createdAt" -> createdAt = reader.nextLong()
                     "updatedAt" -> updatedAt = reader.nextLong()
                     else -> reader.skipValue()
@@ -157,7 +164,7 @@ class DraftManager(private val context: Context) {
 
             if (strict) require(!id.isNullOrBlank()) { "Invalid draft ID" }
             return if (id != null) {
-                Draft(id, content, visibility, attachments, location, createdAt, updatedAt)
+                Draft(id, content, visibility, attachments, location, space, createdAt, updatedAt)
             } else {
                 null
             }
@@ -457,6 +464,13 @@ class DraftManager(private val context: Context) {
         writer.name("location")
         if (draft.location != null) {
             writeLocation(writer, draft.location)
+        } else {
+            writer.nullValue()
+        }
+
+        writer.name("space")
+        if (draft.space != null) {
+            writer.value(draft.space)
         } else {
             writer.nullValue()
         }

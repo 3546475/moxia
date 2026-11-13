@@ -13,6 +13,7 @@ data class Draft(
     val visibility: Visibility = Visibility.PRIVATE,
     val attachments: List<Attachment> = emptyList(),
     val location: Location? = null,
+    val space: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) {
@@ -31,6 +32,7 @@ data class Draft(
             visibility = visibility,
             attachments = attachments.ifEmpty { null },
             location = location,
+            space = space,
             displayTime = Instant.fromEpochMilliseconds(updatedAt),
             state = MemoState.NORMAL,
         )
@@ -48,6 +50,7 @@ fun Memo.toDraft(): Draft {
         visibility = visibility,
         attachments = attachments ?: emptyList(),
         location = location,
+        space = space,
         createdAt = createTime?.toEpochMilliseconds() ?: now,
         updatedAt = updateTime?.toEpochMilliseconds() ?: now,
     )
