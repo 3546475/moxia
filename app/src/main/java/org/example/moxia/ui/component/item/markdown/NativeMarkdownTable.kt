@@ -1,7 +1,5 @@
 package org.example.moxia.ui.component.item.markdown
 
-import org.example.moxia.ui.theme.AppDivider
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -161,6 +159,8 @@ fun NativeMarkdownTable(
             .spanHostInset(bleed.start, bleed.end)
             .padding(top = 8.dp, bottom = 8.dp)
     ) {
+        // The width the host gives the table, i.e. the card's content area.
+        val availableWidth = with(density) { maxWidth.roundToPx() }
         // Allow two viewport widths per column to retain horizontal scrolling,
         // but wrap huge cells before their preferred width becomes unrepresentable.
         val maxCellWidth = with(density) { (maxWidth * 2).roundToPx() }
@@ -194,7 +194,21 @@ fun NativeMarkdownTable(
                     }
                 }
 
-                val tableWidth = columnWidths.sum()
+                var tableWidth = columnWidths.sum()
+                // A table that fits takes the whole content area so it lines up with the card
+                // instead of hugging its narrowest columns. A wider one keeps its own width and
+                // scrolls.
+                if (tableWidth in 1 until availableWidth) {
+                    val extra = availableWidth - tableWidth
+                    var handedOut = 0
+                    for (index in 0 until columnCount) {
+                        val share = extra * columnWidths[index] / tableWidth
+                        columnWidths[index] += share
+                        handedOut += share
+                    }
+                    columnWidths[columnCount - 1] += extra - handedOut
+                    tableWidth = availableWidth
+                }
 
                 // 2. COMPOSITION PASS
                 val contentPlaceables = subcompose("content") {
@@ -210,7 +224,10 @@ fun NativeMarkdownTable(
                                 modifier = Modifier
                                     .width(with(density) { tableWidth.toDp() })
                                     .background(rowBackground)
-                                    .height(IntrinsicSize.Min)
+                                    // The row takes the height of its tallest cell. `IntrinsicSize.Min`
+                                    // would ask for the height the text needs at its narrowest
+                                    // possible width and leave a blank strip under the row.
+                                    .height(IntrinsicSize.Max)
                             ) {
                                 row.forEachIndexed { columnIndex, cell ->
                                     if (columnIndex < columnCount) {
@@ -255,14 +272,6 @@ fun NativeMarkdownTable(
                                         }
                                     }
                                 }
-                            }
-                            // 2. Force the HorizontalDivider to match the calculated width
-                            if (rowIndex < cellMatrix.lastIndex) {
-                                AppDivider(
-                                    modifier = Modifier.width(with(density) { tableWidth.toDp() }),
-                                    thickness = 1.dp,
-                                    color = lineColor
-                                )
                             }
                         }
                     }
