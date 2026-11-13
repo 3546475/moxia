@@ -50,6 +50,8 @@ fun SettingsScreen(
     onOpenLicenses: () -> Unit,
     onShowSetup: () -> Unit,
     section: SettingsSection? = null,
+    /** Opens the space create dialog on arrival, used by the feed switcher shortcut. */
+    openSpaceCreate: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -63,7 +65,11 @@ fun SettingsScreen(
         modifier = modifier
     ) { innerPadding ->
         if (section == null) {
-            SettingsOverview(onOpenSection = onOpenSection, modifier = Modifier.padding(innerPadding))
+            SettingsOverview(
+                onOpenSection = onOpenSection,
+                showSpaces = uiState.space.isSupported,
+                modifier = Modifier.padding(innerPadding)
+            )
         } else if (section == SettingsSection.AUDIT) {
             AuditLogContent(modifier = Modifier.fillMaxSize().padding(innerPadding))
         } else if (section == SettingsSection.APPEARANCE) {
@@ -201,6 +207,40 @@ fun SettingsScreen(
                         )
                     }
                     SettingsSection.RECOVERY -> settingsItem { RecoveryCard() }
+                    SettingsSection.SPACES -> settingsItem {
+                        SpacesSettingsCard(
+                            spaces = uiState.space,
+                            onRefresh = { viewModel.spaceManager.refresh() },
+                            onLoadIncoming = { viewModel.spaceManager.loadIncomingInvitations() },
+                            onCreate = { title, description, icon, onSuccess, onError ->
+                                viewModel.spaceManager.create(title, description, icon, {
+                                    viewModel.spaceManager.select(it.name) {}
+                                    onSuccess()
+                                }, onError)
+                            },
+                            onUpdate = { space, title, description, icon, onSuccess, onError ->
+                                viewModel.spaceManager.update(
+                                    space, title, description, icon, { onSuccess() }, onError
+                                )
+                            },
+                            onDelete = { space, onSuccess, onError ->
+                                viewModel.spaceManager.delete(space, onSuccess, onError)
+                            },
+                            onLoadMembers = { viewModel.spaceManager.loadMembers(it) },
+                            onUpdateRole = { member, role ->
+                                viewModel.spaceManager.updateMemberRole(member, role)
+                            },
+                            onRemoveMember = { viewModel.spaceManager.removeMember(it) },
+                            onLoadInvitations = { viewModel.spaceManager.loadInvitations(it) },
+                            onInvite = { space, username, role, onError ->
+                                viewModel.spaceManager.invite(space, username, role, onError)
+                            },
+                            onRevokeInvitation = { viewModel.spaceManager.revokeInvitation(it) },
+                            onAcceptInvitation = { viewModel.spaceManager.acceptInvitation(it) },
+                            onDeclineInvitation = { viewModel.spaceManager.declineInvitation(it) },
+                            openCreateOnStart = openSpaceCreate
+                        )
+                    }
                     SettingsSection.AUDIT -> Unit
                     SettingsSection.ABOUT -> settingsItem {
                         AboutAppCard(

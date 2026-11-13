@@ -81,6 +81,7 @@ import org.example.moxia.viewmodel.manager.ServerReachabilityMonitor
 import org.example.moxia.viewmodel.manager.UserMemoListManager
 import org.example.moxia.viewmodel.manager.USER_MEMO_COMPARATOR
 import org.example.moxia.model.UserNotification
+import org.example.moxia.model.filter.celString
 import org.example.moxia.model.filter.matches
 import org.example.moxia.model.filter.toCel
 
@@ -131,16 +132,26 @@ class MemosViewModel(
         accountSession, _uiState, memoCacheRepository, dataStoreManager
     )
 
+    val spaceManager = org.example.moxia.viewmodel.manager.MemoSpaceManager(
+        accountSession, _uiState, dataStoreManager
+    )
+
     // Managers
     private val userMemoManager: UserMemoListManager = UserMemoListManager(
         scope = accountSession.readScope,
         apiProvider = { api },
         filterProvider = {
-            val user = _uiState.value.session.currUser
-            val creator = api?.buildMemoCreatorFilter(user)
-            _uiState.value.userMemoList.filter.toCel(creator)
+            val state = _uiState.value
+            val space = state.space.selected
+            val creator = api?.buildMemoCreatorFilter(state.session.currUser)
+            // A space is a shared area: its feed lists every member's memos, so the creator
+            // clause only applies to the unscoped feed.
+            val base = state.userMemoList.filter.toCel(if (space == null) creator else null)
+            if (space == null) base
+            else listOfNotNull(base, "space == ${celString(space)}").joinToString(" && ")
         },
         localFilterProvider = { _uiState.value.userMemoList.filter },
+        spaceProvider = { _uiState.value.space.selected },
         sortProvider = { _uiState.value.userMemoList.filter.sort },
         pageSizeProvider = { _uiState.value.appSettings.pageSize },
         cacheCallbacks = CacheCallbacks(onFetchSuccess = { memos ->
@@ -430,6 +441,28 @@ class MemosViewModel(
         viewModelScope, _uiState, accountSession
     )
 
+    /**
+     * Scopes the notes feed to one space (null = every memo of the account). Same local-first
+     * ordering as the filter: rows of another space leave before the request so the feed never
+     * shows memos the header no longer names.
+     */
+    fun selectSpace(space: String?) {
+        spaceManager.select(space) {
+            val applied = space
+            userMemoManager.updateState { state ->
+                state.copy(
+                    showingCached = false,
+                    items = state.items.filter { memo -> applied == null || memo.space == applied }
+                )
+            }
+            if (_uiState.value.isOnline) {
+                userMemoManager.fetch(refresh = true)
+            } else {
+                userMemoManager.loadFromCache()
+            }
+        }
+    }
+
 
     val appSettingsDelegate: AppSettingsDelegate = AppSettingsDelegateImpl(
         viewModelScope, _uiState, dataStoreManager,
@@ -603,6 +636,7 @@ class MemosViewModel(
         _uiState.update { it.copy(isOnline = reachable.isOnline, connectionState = reachable.connectionState, syncError = reachable.error) }
         if (reachable.connectionState != ConnectionState.ONLINE) return
         memoMapManager.verify()
+        spaceManager.verify()
         syncManager.pushPendingChanges()
         preDownloadManager.maybeAutoDownload()
         if (_uiState.value.session.currUser == null) fetchCurrentUser()
@@ -618,6 +652,7 @@ class MemosViewModel(
         if (account != null && (!org.example.moxia.data.backup.BackupCoordinator.startupReady.value || org.example.moxia.data.backup.BackupCoordinator.restoring.value || org.example.moxia.data.backup.BackupCoordinator.recoveryError.value != null)) return
         _sessionReady.value = false
         memoMapManager.reset()
+        spaceManager.reset()
         _linkPreviews.value = null
         accountSession.clear()
         syncManager.cancelSync()
@@ -646,6 +681,7 @@ class MemosViewModel(
         userMemoManager.loadFromCache()
         exploreMemoManager.loadFromCache()
         memoMapManager.restoreSupport(provisional)
+        spaceManager.restoreSupport(provisional)
         _sessionReady.value = true
         draftDelegate.loadDraftsForAccount(account.id)
         refreshTextCacheCount()
@@ -875,6 +911,7 @@ class MemosViewModel(
         userDelegate.fetchCurrentUser { user ->
             if (!accountSession.isCurrent(context)) return@fetchCurrentUser
             memoMapManager.verify()
+            spaceManager.verify()
             // User fetched, now fetch related data that requires user name
             val name = user.name ?: return@fetchCurrentUser
             accountSession.readScope.launch { shortcutDelegate.fetchShortcuts(name) }

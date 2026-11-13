@@ -4,10 +4,12 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.QuestionMark
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Public
@@ -31,6 +33,7 @@ fun getVisibilityLabel(visibility: Visibility): String {
         Visibility.PUBLIC -> stringResource(R.string.memo_visibility_public)
         Visibility.PROTECTED -> stringResource(R.string.memo_visibility_protected)
         Visibility.PRIVATE -> stringResource(R.string.memo_visibility_private)
+        Visibility.SPACE -> stringResource(R.string.memo_visibility_space)
         Visibility.VISIBILITY_UNSPECIFIED -> stringResource(R.string.memo_visibility_unspecified)
     }
 }
@@ -40,6 +43,7 @@ fun getVisibilityIcon(visibility: Visibility, outlined: Boolean = true): ImageVe
         Visibility.PUBLIC -> if (outlined) Icons.Outlined.Public else Icons.Filled.Public
         Visibility.PROTECTED -> if (outlined) Icons.Outlined.People else Icons.Filled.People
         Visibility.PRIVATE -> if (outlined) Icons.Outlined.Lock else Icons.Filled.Lock
+        Visibility.SPACE -> if (outlined) Icons.Outlined.Groups else Icons.Filled.Groups
         Visibility.VISIBILITY_UNSPECIFIED -> if (outlined) Icons.Outlined.QuestionMark else Icons.Filled.QuestionMark
     }
 }

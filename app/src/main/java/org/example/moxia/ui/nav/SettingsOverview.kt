@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Palette
@@ -55,6 +56,7 @@ enum class SettingsSection(
     APPEARANCE(R.string.settings_appearance, Icons.Outlined.Palette),
     EDITOR(R.string.settings_editor, Icons.Outlined.Code),
     NAVIGATION(R.string.settings_navigation, Icons.Outlined.ViewAgenda),
+    SPACES(R.string.space_title, Icons.Outlined.Groups),
     SHORTCUTS(R.string.profile_shortcuts, Icons.Outlined.Bookmarks),
     WEBHOOKS(R.string.profile_webhooks, Icons.Outlined.Link),
     OFFLINE(R.string.offline_settings_title, Icons.Outlined.CloudDownload),
@@ -65,9 +67,14 @@ enum class SettingsSection(
 }
 
 @Composable
-internal fun SettingsOverview(onOpenSection: (SettingsSection) -> Unit, modifier: Modifier = Modifier) {
+internal fun SettingsOverview(
+    onOpenSection: (SettingsSection) -> Unit,
+    showSpaces: Boolean = false,
+    modifier: Modifier = Modifier
+) {
     // Every section is listed here: the profile page used to link four of them directly, which
     // gave the same screen two homes and left the remaining five reachable only from there.
+    // Spaces only exist on servers that answer the space endpoints.
     val groups = listOf(
         listOf(
             SettingsSection.GENERAL,
@@ -75,7 +82,12 @@ internal fun SettingsOverview(onOpenSection: (SettingsSection) -> Unit, modifier
             SettingsSection.EDITOR,
             SettingsSection.NAVIGATION
         ),
-        listOf(SettingsSection.SHORTCUTS, SettingsSection.WEBHOOKS, SettingsSection.INSTANCE),
+        listOfNotNull(
+            SettingsSection.SPACES.takeIf { showSpaces },
+            SettingsSection.SHORTCUTS,
+            SettingsSection.WEBHOOKS,
+            SettingsSection.INSTANCE
+        ),
         listOf(SettingsSection.OFFLINE, SettingsSection.RECOVERY, SettingsSection.AUDIT),
         listOf(SettingsSection.ABOUT)
     )

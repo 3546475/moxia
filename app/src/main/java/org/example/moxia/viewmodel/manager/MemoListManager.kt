@@ -38,8 +38,14 @@ private val MEMO_TIME_COMPARATOR: Comparator<Memo> =
     compareByDescending { it.displayTime?.toEpochMilliseconds() ?: 0L }
 
 /** Cached rows must obey the applied filter: the cache holds the whole history. */
-private fun memoCacheFilter(provider: () -> MemoFilter): () -> ((Memo) -> Boolean) =
-    { { memo -> provider().matches(memo) } }
+private fun memoCacheFilter(
+    provider: () -> MemoFilter,
+    spaceProvider: () -> String?
+): () -> ((Memo) -> Boolean) = {
+    { memo ->
+        provider().matches(memo) && spaceProvider()?.let { space -> memo.space == space } ?: true
+    }
+}
 
 /** Feed order selected by the user; the server default is pinned-first. */
 private fun MemoSort.comparator(): Comparator<Memo> = when (this) {
@@ -62,6 +68,7 @@ class UserMemoListManager(
     cacheCallbacks: CacheCallbacks<Memo>? = null,
     protectedNamesProvider: (() -> Set<String>)? = null,
     localFilterProvider: (() -> MemoFilter)? = null,
+    private val spaceProvider: () -> String? = { null },
     private val sortProvider: () -> MemoSort = { MemoSort.PINNED_DESC }
 ) : BaseListManager<Memo>(
     scope,
@@ -70,7 +77,7 @@ class UserMemoListManager(
     protectedNamesProvider = protectedNamesProvider,
     sortComparator = USER_MEMO_COMPARATOR,
     sortComparatorProvider = { sortProvider().comparator() },
-    cacheFilterProvider = localFilterProvider?.let(::memoCacheFilter)
+    cacheFilterProvider = localFilterProvider?.let { memoCacheFilter(it, spaceProvider) }
 ) {
 
     override suspend fun fetchFromApi(pageToken: String?): Pair<List<Memo>, String?> {

@@ -208,6 +208,13 @@ fun MemosScreen(
     // what is applied. Everything goes through FilterDelegate, so the request filter, the summary
     // and the persisted copy can never disagree.
     var showFilterPanel by remember { mutableStateOf(false) }
+    // The header entry that replaced the tab row: it opens the feed/space switcher.
+    var showFeedSwitcher by remember { mutableStateOf(false) }
+    val feedSwitcherLabel = if (activeFeed == MemoFeed.EXPLORE) {
+        stringResource(R.string.nav_explore)
+    } else {
+        uiState.space.selectedSpace?.title ?: stringResource(R.string.nav_memos)
+    }
     // Non-null when the "save as view" dialog is open, carrying the compiled filter expression.
     var creatingViewCel by remember { mutableStateOf<String?>(null) }
     var editingShortcut by remember { mutableStateOf<Shortcut?>(null) }
@@ -447,7 +454,11 @@ fun MemosScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             AnimatedVisibility(visible = tabsVisible) {
-                                MemoFeedTabs(pagerState, Modifier.testTag("memo_feed_tabs"))
+                                FeedSwitcher(
+                                    label = feedSwitcherLabel,
+                                    modifier = Modifier.testTag("memo_feed_tabs"),
+                                    onClick = { showFeedSwitcher = true }
+                                )
                             }
                             Spacer(Modifier.weight(1f))
                             // An idle sync state carries no information, so it stays silent.
@@ -494,15 +505,18 @@ fun MemosScreen(
                         enter = slideInVertically { -it } + expandVertically() + fadeIn(),
                         exit = slideOutVertically { -it } + shrinkVertically() + fadeOut()
                     ) {
-                        MemoFeedTabs(
-                            pagerState,
-                            Modifier
-                                .testTag("memo_feed_tabs")
-                                .onSizeChanged {
-                                    feedHeaderHeight = with(density) { it.height.toDp() }
-                                }
-                                .padding(bottom = 16.dp)
-                        )
+                        Row(Modifier.fillMaxWidth().padding(start = 10.dp)) {
+                            FeedSwitcher(
+                                label = feedSwitcherLabel,
+                                modifier = Modifier
+                                    .testTag("memo_feed_tabs")
+                                    .onSizeChanged {
+                                        feedHeaderHeight = with(density) { it.height.toDp() }
+                                    }
+                                    .padding(bottom = 16.dp),
+                                onClick = { showFeedSwitcher = true }
+                            )
+                        }
                     }
                     filterBar()
                 }
@@ -749,8 +763,32 @@ fun MemosScreen(
         }
     )
 
-    // "Save as view" reuses the shortcut editor from settings: it already validates the expression
-    // and reports server errors, so a failed save has somewhere to show up.
+    // The switcher: browse feeds on top, then the spaces of this server, then the management
+    // entry points. A space is a scope of the notes feed as well as a place of its own.
+    if (showFeedSwitcher) {
+        FeedSwitcherSheet(
+            activeFeed = activeFeed,
+            spaces = uiState.space,
+            onSelectFeed = { feed ->
+                showFeedSwitcher = false
+                pagerScope.launch {
+                    pagerState.animateScrollToPage(MemoFeed.entries.indexOf(feed))
+                }
+            },
+            onSelectSpace = { space -> viewModel.selectSpace(space) },
+            onCreateSpace = {
+                showFeedSwitcher = false
+                context.startActivity(SettingsActivity.spacesIntent(context, create = true))
+            },
+            onManageSpaces = {
+                showFeedSwitcher = false
+                context.startActivity(SettingsActivity.spacesIntent(context, create = false))
+            },
+            onDismiss = { showFeedSwitcher = false }
+        )
+    }
+
+    // "Save as view" reuses the shortcut editor from settings: it already validates the expression    // and reports server errors, so a failed save has somewhere to show up.
     creatingViewCel?.let { cel ->
         ShortcutEditDialog(
             title = stringResource(R.string.memo_filter_save_view_title),

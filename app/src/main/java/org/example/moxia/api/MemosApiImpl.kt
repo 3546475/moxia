@@ -20,6 +20,9 @@ import org.example.moxia.model.ListMemoReactionsResponse
 import org.example.moxia.model.ListMemoRelationsResponse
 import org.example.moxia.model.ListMemosResponse
 import org.example.moxia.model.ListPersonalAccessTokensResponse
+import org.example.moxia.model.ListSpaceInvitationsResponse
+import org.example.moxia.model.ListSpaceMembersResponse
+import org.example.moxia.model.ListSpacesResponse
 import org.example.moxia.model.ListUserNotificationsResponse
 import org.example.moxia.model.ListUserSettingsResponse
 import org.example.moxia.model.ListUserWebhooksResponse
@@ -34,6 +37,9 @@ import org.example.moxia.model.Shortcut
 import org.example.moxia.model.ShortcutResponse
 import org.example.moxia.model.SignInRequest
 import org.example.moxia.model.SignInResponse
+import org.example.moxia.model.Space
+import org.example.moxia.model.SpaceInvitation
+import org.example.moxia.model.SpaceMember
 import org.example.moxia.model.UpsertMemoReactionRequest
 import org.example.moxia.model.User
 import org.example.moxia.model.UserNotification
@@ -456,5 +462,85 @@ open class MemosApiImpl(
 
     override suspend fun listAllUserStats(): ListAllUserStatsResponse {
         return api.listAllUserStats()
+    }
+
+    override suspend fun listSpaces(pageSize: Int?, pageToken: String?): ListSpacesResponse {
+        return api.listSpaces(pageSize, pageToken)
+    }
+
+    override suspend fun getSpace(space: String): Space {
+        return api.getSpace(space.substringAfterLast('/'))
+    }
+
+    override suspend fun createSpace(space: Space, spaceId: String?): Space {
+        return api.createSpace(space, spaceId)
+    }
+
+    override suspend fun updateSpace(space: String, spaceData: Space, updateMask: String): Space {
+        return api.updateSpace(space.substringAfterLast('/'), spaceData, updateMask)
+    }
+
+    override suspend fun deleteSpace(space: String) {
+        return api.deleteSpace(space.substringAfterLast('/'))
+    }
+
+    override suspend fun listSpaceMembers(
+        space: String,
+        pageSize: Int?,
+        pageToken: String?
+    ): ListSpaceMembersResponse {
+        return api.listSpaceMembers(space.substringAfterLast('/'), pageSize, pageToken)
+    }
+
+    override suspend fun updateSpaceMember(
+        spaceMember: String,
+        spaceMemberData: SpaceMember,
+        updateMask: String
+    ): SpaceMember {
+        val parts = spaceMember.split('/')
+        return api.updateSpaceMember(parts[1], parts[3], spaceMemberData, updateMask)
+    }
+
+    override suspend fun deleteSpaceMember(spaceMember: String) {
+        val parts = spaceMember.split('/')
+        return api.deleteSpaceMember(parts[1], parts[3])
+    }
+
+    override suspend fun listSpaceInvitations(
+        space: String,
+        pageSize: Int?,
+        pageToken: String?
+    ): ListSpaceInvitationsResponse {
+        return api.listSpaceInvitations(space.substringAfterLast('/'), pageSize, pageToken)
+    }
+
+    override suspend fun createSpaceInvitation(
+        space: String,
+        spaceInvitation: SpaceInvitation
+    ): SpaceInvitation {
+        return api.createSpaceInvitation(space.substringAfterLast('/'), spaceInvitation)
+    }
+
+    override suspend fun deleteSpaceInvitation(spaceInvitation: String) {
+        val parts = spaceInvitation.split('/')
+        return api.deleteSpaceInvitation(parts[1], parts[3])
+    }
+
+    override suspend fun acceptSpaceInvitation(spaceInvitation: String): SpaceMember {
+        val parts = spaceInvitation.split('/')
+        return api.acceptSpaceInvitation(parts[1], parts[3])
+    }
+
+    override suspend fun declineSpaceInvitation(spaceInvitation: String) {
+        val parts = spaceInvitation.split('/')
+        return api.declineSpaceInvitation(parts[1], parts[3])
+    }
+
+    override suspend fun listUserSpaceInvitations(
+        user: String,
+        pageSize: Int?,
+        pageToken: String?
+    ): ListSpaceInvitationsResponse {
+        return api.listUserSpaceInvitations(user.substringAfterLast('/'), pageSize, pageToken)
     }
 }

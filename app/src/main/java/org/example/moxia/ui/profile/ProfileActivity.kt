@@ -182,6 +182,7 @@ class SettingsActivity : ProfileActivity() {
     @Composable
     override fun Destination(viewModel: MemosViewModel, onBack: () -> Unit) {
         val section = SettingsSection.entries.firstOrNull { it.name == intent.getStringExtra(EXTRA_SECTION) }
+        val openSpaceCreate = intent.getBooleanExtra(EXTRA_CREATE_SPACE, false)
         val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             viewModel.refreshAfterProfileDetails()
         }
@@ -189,6 +190,7 @@ class SettingsActivity : ProfileActivity() {
             viewModel = viewModel,
             onBack = onBack,
             section = section,
+            openSpaceCreate = openSpaceCreate,
             onOpenLicenses = {
                 launcher.launch(Intent(this, OpenSourceLicensesActivity::class.java))
             },
@@ -198,14 +200,17 @@ class SettingsActivity : ProfileActivity() {
             onOpenSection = { destination ->
                 launcher.launch(createIntent(this, destination))
             }
-        )
-    }
+        )    }
 
     companion object {
         private const val EXTRA_SECTION = "settings_section"
+        private const val EXTRA_CREATE_SPACE = "settings_create_space"
 
         fun createIntent(context: Context, section: SettingsSection): Intent =
             Intent(context, SettingsActivity::class.java).putExtra(EXTRA_SECTION, section.name)
+
+        fun spacesIntent(context: Context, create: Boolean): Intent =
+            createIntent(context, SettingsSection.SPACES).putExtra(EXTRA_CREATE_SPACE, create)
     }
 }
 

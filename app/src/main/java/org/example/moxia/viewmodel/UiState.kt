@@ -115,6 +115,7 @@ enum class ConnectionState {
 
 data class MemosUiState(
     val memoMap: MemoMapState = MemoMapState(),
+    val space: org.example.moxia.model.SpaceState = org.example.moxia.model.SpaceState(),
     val session: SessionState = SessionState(),
     val userMemoList: MemoListState = MemoListState(),
     val exploreMemoList: MemoListState = MemoListState(),

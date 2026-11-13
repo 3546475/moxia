@@ -25,6 +25,9 @@ enum class Visibility {
     @SerialName("PRIVATE")
     PRIVATE,
 
+    @SerialName("SPACE")
+    SPACE,
+
     @SerializedName("VISIBILITY_UNSPECIFIED")
     VISIBILITY_UNSPECIFIED
 }
@@ -51,6 +54,8 @@ data class Memo(
     @SerializedName("displayTime", alternate = ["display_time"]) val displayTime: Instant? = null,
     val content: String,
     val visibility: Visibility = Visibility.PRIVATE,
+    /** The space this memo belongs to (`spaces/{uid}`), or null when it is unassigned. */
+    val space: String? = null,
     val tags: List<String>? = null,
     val pinned: Boolean? = null,
     val attachments: List<Attachment>? = null,

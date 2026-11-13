@@ -19,6 +19,9 @@ import org.example.moxia.model.ListMemoReactionsResponse
 import org.example.moxia.model.ListMemoRelationsResponse
 import org.example.moxia.model.ListMemosResponse
 import org.example.moxia.model.ListPersonalAccessTokensResponse
+import org.example.moxia.model.ListSpaceInvitationsResponse
+import org.example.moxia.model.ListSpaceMembersResponse
+import org.example.moxia.model.ListSpacesResponse
 import org.example.moxia.model.ListUserNotificationsResponse
 import org.example.moxia.model.ListUserSettingsResponse
 import org.example.moxia.model.ListUserWebhooksResponse
@@ -33,6 +36,9 @@ import org.example.moxia.model.Shortcut
 import org.example.moxia.model.ShortcutResponse
 import org.example.moxia.model.SignInRequest
 import org.example.moxia.model.SignInResponse
+import org.example.moxia.model.Space
+import org.example.moxia.model.SpaceInvitation
+import org.example.moxia.model.SpaceMember
 import org.example.moxia.model.UpsertMemoReactionRequest
 import org.example.moxia.model.UseRole
 import org.example.moxia.model.UseState
@@ -392,6 +398,83 @@ interface MemosApiV0353 {
 
     @GET("users:stats")
     suspend fun listAllUserStats(): ListAllUserStatsResponse
+
+    // --- SpaceService ---
+    // The space resource name is `spaces/{uid}`; the uid alone addresses the
+    // space in the URL, so the prefix is stripped before the path is built.
+    @GET("spaces")
+    suspend fun listSpaces(
+        @Query("pageSize") pageSize: Int? = null, @Query("pageToken") pageToken: String? = null
+    ): ListSpacesResponse
+
+    @GET("spaces/{uid}")
+    suspend fun getSpace(@Path("uid") uid: String): Space
+
+    @POST("spaces")
+    suspend fun createSpace(
+        @Body space: Space, @Query("spaceId") spaceId: String? = null
+    ): Space
+
+    @PATCH("spaces/{uid}")
+    suspend fun updateSpace(
+        @Path("uid") uid: String,
+        @Body spaceData: Space,
+        @Query("updateMask") updateMask: String
+    ): Space
+
+    @DELETE("spaces/{uid}")
+    suspend fun deleteSpace(@Path("uid") uid: String)
+
+    @GET("spaces/{uid}/members")
+    suspend fun listSpaceMembers(
+        @Path("uid") uid: String,
+        @Query("pageSize") pageSize: Int? = null, @Query("pageToken") pageToken: String? = null
+    ): ListSpaceMembersResponse
+
+    @PATCH("spaces/{uid}/members/{member}")
+    suspend fun updateSpaceMember(
+        @Path("uid") uid: String,
+        @Path("member") member: String,
+        @Body spaceMemberData: SpaceMember,
+        @Query("updateMask") updateMask: String
+    ): SpaceMember
+
+    @DELETE("spaces/{uid}/members/{member}")
+    suspend fun deleteSpaceMember(
+        @Path("uid") uid: String, @Path("member") member: String
+    )
+
+    @GET("spaces/{uid}/invitations")
+    suspend fun listSpaceInvitations(
+        @Path("uid") uid: String,
+        @Query("pageSize") pageSize: Int? = null, @Query("pageToken") pageToken: String? = null
+    ): ListSpaceInvitationsResponse
+
+    @POST("spaces/{uid}/invitations")
+    suspend fun createSpaceInvitation(
+        @Path("uid") uid: String, @Body spaceInvitation: SpaceInvitation
+    ): SpaceInvitation
+
+    @DELETE("spaces/{uid}/invitations/{invitation}")
+    suspend fun deleteSpaceInvitation(
+        @Path("uid") uid: String, @Path("invitation") invitation: String
+    )
+
+    @POST("spaces/{uid}/invitations/{invitation}:accept")
+    suspend fun acceptSpaceInvitation(
+        @Path("uid") uid: String, @Path("invitation") invitation: String
+    ): SpaceMember
+
+    @POST("spaces/{uid}/invitations/{invitation}:decline")
+    suspend fun declineSpaceInvitation(
+        @Path("uid") uid: String, @Path("invitation") invitation: String
+    )
+
+    @GET("users/{uid}/spaceInvitations")
+    suspend fun listUserSpaceInvitations(
+        @Path("uid") uid: String,
+        @Query("pageSize") pageSize: Int? = null, @Query("pageToken") pageToken: String? = null
+    ): ListSpaceInvitationsResponse
 }
 
 data class UserV0353(

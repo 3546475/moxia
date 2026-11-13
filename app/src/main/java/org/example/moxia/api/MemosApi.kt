@@ -19,6 +19,9 @@ import org.example.moxia.model.ListMemoReactionsResponse
 import org.example.moxia.model.ListMemoRelationsResponse
 import org.example.moxia.model.ListMemosResponse
 import org.example.moxia.model.ListPersonalAccessTokensResponse
+import org.example.moxia.model.ListSpaceInvitationsResponse
+import org.example.moxia.model.ListSpaceMembersResponse
+import org.example.moxia.model.ListSpacesResponse
 import org.example.moxia.model.ListUserNotificationsResponse
 import org.example.moxia.model.ListUserSettingsResponse
 import org.example.moxia.model.ListUserWebhooksResponse
@@ -33,6 +36,9 @@ import org.example.moxia.model.Shortcut
 import org.example.moxia.model.ShortcutResponse
 import org.example.moxia.model.SignInRequest
 import org.example.moxia.model.SignInResponse
+import org.example.moxia.model.Space
+import org.example.moxia.model.SpaceInvitation
+import org.example.moxia.model.SpaceMember
 import org.example.moxia.model.UpsertMemoReactionRequest
 import org.example.moxia.model.User
 import org.example.moxia.model.UserNotification
@@ -237,6 +243,76 @@ interface MemosApi {
     suspend fun setMemoRelations(
         memo: String, request: SetMemoRelationsRequest
     )
+
+    // --- SpaceService ---
+    suspend fun listSpaces(
+        pageSize: Int? = null,
+        pageToken: String? = null
+    ): ListSpacesResponse
+
+    suspend fun getSpace(
+        space: String
+    ): Space
+
+    suspend fun createSpace(
+        space: Space,
+        spaceId: String? = null
+    ): Space
+
+    suspend fun updateSpace(
+        space: String,
+        spaceData: Space,
+        updateMask: String
+    ): Space
+
+    suspend fun deleteSpace(
+        space: String
+    )
+
+    suspend fun listSpaceMembers(
+        space: String,
+        pageSize: Int? = null,
+        pageToken: String? = null
+    ): ListSpaceMembersResponse
+
+    suspend fun updateSpaceMember(
+        spaceMember: String,
+        spaceMemberData: SpaceMember,
+        updateMask: String
+    ): SpaceMember
+
+    suspend fun deleteSpaceMember(
+        spaceMember: String
+    )
+
+    suspend fun listSpaceInvitations(
+        space: String,
+        pageSize: Int? = null,
+        pageToken: String? = null
+    ): ListSpaceInvitationsResponse
+
+    suspend fun createSpaceInvitation(
+        space: String,
+        spaceInvitation: SpaceInvitation
+    ): SpaceInvitation
+
+    suspend fun deleteSpaceInvitation(
+        spaceInvitation: String
+    )
+
+    suspend fun acceptSpaceInvitation(
+        spaceInvitation: String
+    ): SpaceMember
+
+    suspend fun declineSpaceInvitation(
+        spaceInvitation: String
+    )
+
+    suspend fun listUserSpaceInvitations(
+        user: String,
+        pageSize: Int? = null,
+        pageToken: String? = null
+    ): ListSpaceInvitationsResponse
 
     // --- UserService ---
     suspend fun listUsers(
