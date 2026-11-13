@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.ast.findChildOfType
@@ -153,14 +155,11 @@ fun NativeMarkdownTable(
 
     val scrollState = rememberScrollState()
     BoxWithConstraints(
-        modifier = Modifier.padding(
+        modifier = Modifier
             // The table spans the card's content width instead of the text column, so a wide
             // table gets the room it needs and still lines up with the card.
-            start = -bleed.start,
-            end = -bleed.end,
-            top = 8.dp,
-            bottom = 8.dp
-        )
+            .spanHostInset(bleed.start, bleed.end)
+            .padding(top = 8.dp, bottom = 8.dp)
     ) {
         // Allow two viewport widths per column to retain horizontal scrolling,
         // but wrap huge cells before their preferred width becomes unrepresentable.
@@ -283,6 +282,31 @@ fun NativeMarkdownTable(
                 }
             }
         }
+    }
+}
+
+/**
+ * Lets the table use the width the host's text column spends on its inset.
+ *
+ * Compose refuses negative padding, so the extra width is measured instead: the child is
+ * measured with the inset added to its maximum width and is then placed over the inset. The
+ * reported size stays the width the host handed out, so the surrounding layout is untouched.
+ */
+private fun Modifier.spanHostInset(insetStart: Dp, insetEnd: Dp) = layout { measurable, constraints ->
+    val extraWidth = (insetStart + insetEnd).roundToPx()
+    val childConstraints = if (constraints.maxWidth == Constraints.Infinity) {
+        constraints
+    } else {
+        constraints.copy(maxWidth = constraints.maxWidth + extraWidth)
+    }
+    val placeable = measurable.measure(childConstraints)
+    val width = if (constraints.maxWidth == Constraints.Infinity) {
+        placeable.width
+    } else {
+        constraints.maxWidth
+    }
+    layout(width, placeable.height) {
+        placeable.place(-insetStart.roundToPx(), 0)
     }
 }
 
