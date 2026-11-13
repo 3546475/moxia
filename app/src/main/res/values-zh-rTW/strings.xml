@@ -58,6 +58,7 @@
     <string name="memo_filter_empty_message">換個篩選條件，或清除篩選檢視全部筆記。</string>
     <string name="memo_filter_clear_action">清除篩選</string>
     <string name="memo_filter_change_action">修改篩選</string>
+    <string name="memo_filter_page_conditions">條件</string>
     <string name="memo_filter_section_views">儲存檢視</string>
     <string name="memo_filter_section_tags">標籤</string>
     <string name="memo_filter_section_types">內容類型</string>

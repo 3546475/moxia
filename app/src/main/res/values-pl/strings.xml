@@ -61,6 +61,7 @@
     <string name="memo_filter_empty_message">Wybierz inny filtr lub wyczyść go, aby zobaczyć wszystkie notatki.</string>
     <string name="memo_filter_clear_action">Wyczyść filtr</string>
     <string name="memo_filter_change_action">Zmień filtr</string>
+    <string name="memo_filter_page_conditions">Warunki</string>
     <string name="memo_filter_section_views">Zapisane widoki</string>
     <string name="memo_filter_section_tags">Tagi</string>
     <string name="memo_filter_section_types">Typ treści</string>

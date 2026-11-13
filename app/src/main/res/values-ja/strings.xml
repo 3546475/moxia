@@ -91,6 +91,7 @@
     <string name="memo_filter_empty_message">別のフィルターを試すか、クリアしてすべてのメモを表示してください。</string>
     <string name="memo_filter_clear_action">フィルターをクリア</string>
     <string name="memo_filter_change_action">フィルターを変更</string>
+    <string name="memo_filter_page_conditions">条件</string>
     <string name="memo_filter_section_views">保存したビュー</string>
     <string name="memo_filter_section_tags">タグ</string>
     <string name="memo_filter_section_types">コンテンツ種別</string>

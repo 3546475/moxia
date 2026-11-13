@@ -63,6 +63,7 @@
     <string name="memo_filter_empty_message">Try another filter, or clear it to see all your memos.</string>
     <string name="memo_filter_clear_action">Clear filter</string>
     <string name="memo_filter_change_action">Change filter</string>
+    <string name="memo_filter_page_conditions">Conditions</string>
     <string name="memo_filter_section_views">Saved views</string>
     <string name="memo_filter_section_tags">Tags</string>
     <string name="memo_filter_section_types">Content type</string>

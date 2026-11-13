@@ -91,6 +91,7 @@
     <string name="memo_filter_empty_message">Wähle einen anderen Filter oder setze ihn zurück, um alle Notizen zu sehen.</string>
     <string name="memo_filter_clear_action">Filter zurücksetzen</string>
     <string name="memo_filter_change_action">Filter ändern</string>
+    <string name="memo_filter_page_conditions">Bedingungen</string>
     <string name="memo_filter_section_views">Gespeicherte Ansichten</string>
     <string name="memo_filter_section_tags">Tags</string>
     <string name="memo_filter_section_types">Inhaltstyp</string>

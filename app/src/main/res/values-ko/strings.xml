@@ -91,6 +91,7 @@
     <string name="memo_filter_empty_message">다른 필터를 사용하거나 필터를 지워 모든 메모를 확인하세요.</string>
     <string name="memo_filter_clear_action">필터 지우기</string>
     <string name="memo_filter_change_action">필터 변경</string>
+    <string name="memo_filter_page_conditions">조건</string>
     <string name="memo_filter_section_views">저장된 보기</string>
     <string name="memo_filter_section_tags">태그</string>
     <string name="memo_filter_section_types">콘텐츠 유형</string>

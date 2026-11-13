@@ -103,6 +103,7 @@
     <string name="memo_filter_empty_message">换个筛选条件，或清除筛选查看全部笔记。</string>
     <string name="memo_filter_clear_action">清除筛选</string>
     <string name="memo_filter_change_action">修改筛选</string>
+    <string name="memo_filter_page_conditions">条件</string>
     <string name="memo_filter_section_views">保存的视图</string>
     <string name="memo_filter_section_tags">标签</string>
     <string name="memo_filter_section_types">内容类型</string>

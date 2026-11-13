@@ -8,7 +8,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -28,6 +31,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,9 +53,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
@@ -69,6 +77,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.launch
 import org.example.moxia.R
 import org.example.moxia.model.MemoContentType
 import org.example.moxia.model.Shortcut
@@ -88,6 +97,84 @@ import org.example.moxia.ui.theme.AppFilterChip
 import org.example.moxia.ui.theme.AppRadioButton
 import org.example.moxia.ui.theme.AppTextField
 import org.example.moxia.ui.theme.MiuixTokens
+
+/** The two pages of the filter panel. */
+private enum class FilterPage(val labelRes: Int) {
+    CONDITIONS(R.string.memo_filter_page_conditions),
+    TAGS(R.string.memo_filter_section_tags)
+}
+
+/**
+ * Height of the swipeable pages. The pages plus the switcher add up to the 420dp the single
+ * list used to take, so the dialog does not change size when the panel is opened.
+ */
+private val FilterContentHeight = 376.dp
+
+/** Height of the page switcher above the pages. */
+private val FilterTabsHeight = 44.dp
+
+/**
+ * The page switcher above the filter pages. Plain text with a short underline, the same quiet
+ * treatment the feed switcher uses: a full tab bar would compete with the dialog title.
+ */
+@Composable
+private fun FilterPageTabs(
+    pages: List<FilterPage>,
+    currentPage: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(FilterTabsHeight)
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        pages.forEachIndexed { index, page ->
+            val selected = index == currentPage
+            val contentColor by animateColorAsState(
+                targetValue = if (selected) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                label = "filterTabContent"
+            )
+            val indicatorAlpha by animateFloatAsState(
+                targetValue = if (selected) 1f else 0f,
+                label = "filterTabIndicator"
+            )
+            Column(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClickLabel = stringResource(page.labelRes)
+                    ) { onSelect(index) }
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = stringResource(page.labelRes),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = contentColor
+                )
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .alpha(indicatorAlpha)
+                        .width(16.dp)
+                        .height(3.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                )
+            }
+        }
+    }
+}
 
 /**
  * The structured filter panel: saved views, tags (AND/OR), the memo kind, a created-time window
@@ -144,6 +231,10 @@ fun FilterPanel(
     val datePresets = remember(today, zone, locale) {
         FilterDatePreset.entries.associateWith { it.range(today, zone, locale) }
     }
+    // The panel is split into two pages that the user swipes between, so the pager lives with
+    // the dialog instead of with the feed it filters.
+    val pagerState = rememberPagerState(pageCount = { FilterPage.entries.size })
+    val scope = rememberCoroutineScope()
 
     AppDialog(
         show = show,
@@ -179,293 +270,316 @@ fun FilterPanel(
             }
         }
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            item(key = "views") {
-                Column(Modifier.padding(top = 2.dp)) {
-                    SectionHeader(
-                        title = stringResource(R.string.memo_filter_section_views),
-                        trailing = {
-                            // Saving and managing views belong to the views list; in a footer below
-                            // the fold nobody ever found them.
-                            IconButton(
-                                onClick = { compiledCel?.let(onSaveAsView) },
-                                enabled = compiledCel != null
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.BookmarkAdd,
-                                    contentDescription = stringResource(R.string.memo_filter_save_view),
-                                    modifier = Modifier.size(MiuixTokens.IconSmall)
-                                )
-                            }
-                            IconButton(onClick = onManageShortcuts) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Tune,
-                                    contentDescription = stringResource(R.string.memo_filter_manage),
-                                    modifier = Modifier.size(MiuixTokens.IconSmall)
-                                )
-                            }
-                        }
-                    )
-                    ChoiceRow(
-                        selected = !draft.hasLegacyClause,
-                        label = stringResource(R.string.memo_filter_all),
-                        onClick = { draft = draft.copy(viewName = null, legacyCel = emptyList()) }
-                    )
-                    shortcuts.forEach { shortcut ->
-                        val cel = shortcut.filter?.trim().orEmpty()
-                        ChoiceRow(
-                            selected = draft.viewName != null && draft.viewName == shortcut.name,
-                            label = shortcut.title.orEmpty(),
-                            onClick = {
-                                // A view is a preset: picking it replaces the base clause and any
-                                // facets added on top of it. The sort is a preference, not part of
-                                // the view, so it survives.
-                                draft = if (cel.isEmpty()) {
-                                    draft.copy(viewName = null, legacyCel = emptyList())
-                                } else {
-                                    MemoFilter(
-                                        viewName = shortcut.name,
-                                        legacyCel = listOf(cel),
-                                        sort = draft.sort
-                                    )
-                                }
-                            },
-                            trailing = {
-                                IconButton(onClick = { onEditShortcut(shortcut) }) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Edit,
-                                        contentDescription = stringResource(R.string.memo_filter_edit_raw),
-                                        modifier = Modifier.size(20.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        )
-                    }
-                    if (shortcuts.isEmpty()) {
-                        Hint(stringResource(R.string.memo_filter_none))
-                    }
-                }
-            }
-
-            item(key = "tags-header") {
-                Column(Modifier.padding(top = SectionGap)) {
-                    SectionHeader(
-                        title = stringResource(R.string.memo_filter_section_tags),
-                        trailing = {
-                            IconButton(onClick = {
-                                tagSearchOpen = !tagSearchOpen
-                                if (!tagSearchOpen) tagQuery = ""
-                            }) {
-                                Icon(
-                                    imageVector = if (tagSearchOpen) {
-                                        Icons.Outlined.Close
-                                    } else {
-                                        Icons.Outlined.Search
-                                    },
-                                    contentDescription = stringResource(
-                                        if (tagSearchOpen) {
-                                            R.string.common_close
-                                        } else {
-                                            R.string.memo_filter_tag_search
-                                        }
-                                    ),
-                                    modifier = Modifier.size(MiuixTokens.IconSmall)
-                                )
-                            }
-                            if (collapsibleTags.isNotEmpty()) {
-                                val allCollapsed = collapsedTags.containsAll(collapsibleTags)
-                                IconButton(onClick = {
-                                    collapsedTags = if (allCollapsed) emptySet() else collapsibleTags
-                                }) {
-                                    Icon(
-                                        imageVector = if (allCollapsed) {
-                                            Icons.Outlined.UnfoldMore
-                                        } else {
-                                            Icons.Outlined.UnfoldLess
-                                        },
-                                        contentDescription = stringResource(
-                                            if (allCollapsed) {
-                                                R.string.tags_expand_all
-                                            } else {
-                                                R.string.tags_collapse_all
-                                            }
-                                        ),
-                                        modifier = Modifier.size(MiuixTokens.IconSmall)
-                                    )
-                                }
-                            }
-                        }
-                    )
-                    // The AND/OR switch is a row of its own: as chips beside the heading it stole
-                    // the heading's line and left both looking cramped.
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 16.dp, end = 16.dp, top = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = stringResource(R.string.memo_filter_tag_match),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f)
-                        )
-                        AppFilterChip(
-                            selected = draft.tagMatch == TagMatch.ALL,
-                            onClick = { draft = draft.copy(tagMatch = TagMatch.ALL) }
-                        ) {
-                            Text(stringResource(R.string.memo_filter_tags_all))
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        AppFilterChip(
-                            selected = draft.tagMatch == TagMatch.ANY,
-                            onClick = { draft = draft.copy(tagMatch = TagMatch.ANY) }
-                        ) {
-                            Text(stringResource(R.string.memo_filter_tags_any))
-                        }
-                    }
-                }
-            }
-
-            item(key = "tags-search") {
-                // A permanent item whose content expands: inserting and removing the item itself
-                // made the field pop open instead of growing.
-                AnimatedVisibility(
-                    visible = tagSearchOpen,
-                    enter = expandVertically(animationSpec = tween(180)) + fadeIn(tween(120)),
-                    exit = shrinkVertically(animationSpec = tween(150)) + fadeOut(tween(100))
+        // One long list hid the other conditions behind the tag tree. Two swipeable pages
+        // keep every condition reachable, and the strip above says which page is open.
+        FilterPageTabs(
+            pages = FilterPage.entries,
+            currentPage = pagerState.currentPage,
+            onSelect = { page -> scope.launch { pagerState.animateScrollToPage(page) } }
+        )
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth().height(FilterContentHeight),
+            key = { FilterPage.entries[it] }
+        ) { page ->
+            when (FilterPage.entries[page]) {
+                FilterPage.CONDITIONS -> LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    AppTextField(
-                        value = tagQuery,
-                        onValueChange = { tagQuery = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 16.dp, top = 8.dp, end = 16.dp),
-                        placeholder = stringResource(R.string.memo_filter_tag_search),
-                        singleLine = true,
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Outlined.Search,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    )
-                }
-            }
-
-            if (tagRows.isEmpty()) {
-                item(key = "tags-empty") {
-                    Hint(
-                        if (treeCounts.isEmpty()) {
-                            stringResource(R.string.memo_filter_no_tags)
-                        } else {
-                            stringResource(R.string.memo_filter_no_match)
-                        }
-                    )
-                }
-            } else {
-                items(tagRows, key = { "tag:${it.path}" }) { node ->
-                    TagTreeRow(
-                        node = node,
-                        selected = node.path in draft.tags,
-                        descendantSelected = hasSelectedDescendant(draft.tags, node.path),
-                        expanded = node.path !in collapsedTags,
-                        onToggleSelect = {
-                            draft = draft.copy(
-                                tags = if (node.path in draft.tags) {
-                                    draft.tags - node.path
-                                } else {
-                                    draft.tags + node.path
+                    item(key = "views") {
+                        Column(Modifier.padding(top = 2.dp)) {
+                            SectionHeader(
+                                title = stringResource(R.string.memo_filter_section_views),
+                                trailing = {
+                                    // Saving and managing views belong to the views list; in a footer below
+                                    // the fold nobody ever found them.
+                                    IconButton(
+                                        onClick = { compiledCel?.let(onSaveAsView) },
+                                        enabled = compiledCel != null
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.BookmarkAdd,
+                                            contentDescription = stringResource(R.string.memo_filter_save_view),
+                                            modifier = Modifier.size(MiuixTokens.IconSmall)
+                                        )
+                                    }
+                                    IconButton(onClick = onManageShortcuts) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Tune,
+                                            contentDescription = stringResource(R.string.memo_filter_manage),
+                                            modifier = Modifier.size(MiuixTokens.IconSmall)
+                                        )
+                                    }
                                 }
                             )
-                        },
-                        onToggleExpand = {
-                            collapsedTags = if (node.path in collapsedTags) {
-                                collapsedTags - node.path
-                            } else {
-                                collapsedTags + node.path
-                            }
-                        },
-                        // Folding a branch or filtering the list animates the rows into their new
-                        // places instead of re-drawing the pane.
-                        modifier = Modifier.animateItem()
-                    )
-                }
-            }
-
-            item(key = "types") {
-                Column(Modifier.padding(top = SectionGap)) {
-                    SectionHeader(stringResource(R.string.memo_filter_section_types))
-                    ChipFlow {
-                        MemoContentType.entries.forEach { type ->
-                            AppFilterChip(
-                                selected = type in draft.types,
-                                onClick = {
-                                    draft = draft.copy(
-                                        types = if (type in draft.types) {
-                                            draft.types - type
+                            ChoiceRow(
+                                selected = !draft.hasLegacyClause,
+                                label = stringResource(R.string.memo_filter_all),
+                                onClick = { draft = draft.copy(viewName = null, legacyCel = emptyList()) }
+                            )
+                            shortcuts.forEach { shortcut ->
+                                val cel = shortcut.filter?.trim().orEmpty()
+                                ChoiceRow(
+                                    selected = draft.viewName != null && draft.viewName == shortcut.name,
+                                    label = shortcut.title.orEmpty(),
+                                    onClick = {
+                                        // A view is a preset: picking it replaces the base clause and any
+                                        // facets added on top of it. The sort is a preference, not part of
+                                        // the view, so it survives.
+                                        draft = if (cel.isEmpty()) {
+                                            draft.copy(viewName = null, legacyCel = emptyList())
                                         } else {
-                                            draft.types + type
+                                            MemoFilter(
+                                                viewName = shortcut.name,
+                                                legacyCel = listOf(cel),
+                                                sort = draft.sort
+                                            )
                                         }
+                                    },
+                                    trailing = {
+                                        IconButton(onClick = { onEditShortcut(shortcut) }) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Edit,
+                                                contentDescription = stringResource(R.string.memo_filter_edit_raw),
+                                                modifier = Modifier.size(20.dp),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+                            if (shortcuts.isEmpty()) {
+                                Hint(stringResource(R.string.memo_filter_none))
+                            }
+                        }
+                    }
+
+                    item(key = "types") {
+                        Column(Modifier.padding(top = SectionGap)) {
+                            SectionHeader(stringResource(R.string.memo_filter_section_types))
+                            ChipFlow {
+                                MemoContentType.entries.forEach { type ->
+                                    AppFilterChip(
+                                        selected = type in draft.types,
+                                        onClick = {
+                                            draft = draft.copy(
+                                                types = if (type in draft.types) {
+                                                    draft.types - type
+                                                } else {
+                                                    draft.types + type
+                                                }
+                                            )
+                                        }
+                                    ) {
+                                        Text(type.typeLabel())
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item(key = "date") {
+                        Column(Modifier.padding(top = SectionGap)) {
+                            SectionHeader(stringResource(R.string.memo_filter_section_date))
+                            val customRange = draft.date?.takeIf {
+                                filterDatePresetOf(it, today, zone, locale) == null
+                            }
+                            ChipFlow {
+                                FilterDatePreset.entries.forEach { preset ->
+                                    val range = datePresets[preset]
+                                    AppFilterChip(
+                                        selected = draft.date == range,
+                                        onClick = { draft = draft.copy(date = range) }
+                                    ) {
+                                        Text(preset.dateLabel())
+                                    }
+                                }
+                                // The picked window becomes the chip's own label: the extra grey line that
+                                // used to spell it out below the row is gone.
+                                AppFilterChip(
+                                    selected = customRange != null,
+                                    onClick = { showDatePicker = true }
+                                ) {
+                                    Text(
+                                        customRange?.chipLabel(zone)
+                                            ?: stringResource(R.string.memo_filter_date_custom)
                                     )
                                 }
-                            ) {
-                                Text(type.typeLabel())
+                            }
+                        }
+                    }
+
+                    item(key = "sort") {
+                        Column(Modifier.padding(top = SectionGap)) {
+                            SectionHeader(stringResource(R.string.memo_filter_section_sort))
+                            ChipFlow {
+                                MemoSort.entries.forEach { sort ->
+                                    AppFilterChip(
+                                        selected = draft.sort == sort,
+                                        onClick = { draft = draft.copy(sort = sort) }
+                                    ) {
+                                        Text(sort.sortLabel())
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            item(key = "date") {
-                Column(Modifier.padding(top = SectionGap)) {
-                    SectionHeader(stringResource(R.string.memo_filter_section_date))
-                    val customRange = draft.date?.takeIf {
-                        filterDatePresetOf(it, today, zone, locale) == null
-                    }
-                    ChipFlow {
-                        FilterDatePreset.entries.forEach { preset ->
-                            val range = datePresets[preset]
-                            AppFilterChip(
-                                selected = draft.date == range,
-                                onClick = { draft = draft.copy(date = range) }
+                FilterPage.TAGS -> LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    item(key = "tags-header") {
+                        Column(Modifier.padding(top = SectionGap)) {
+                            SectionHeader(
+                                // The tab strip above already names this page, so the
+                                // heading keeps only the tools that act on the list.
+                                title = "",
+                                trailing = {
+                                    IconButton(onClick = {
+                                        tagSearchOpen = !tagSearchOpen
+                                        if (!tagSearchOpen) tagQuery = ""
+                                    }) {
+                                        Icon(
+                                            imageVector = if (tagSearchOpen) {
+                                                Icons.Outlined.Close
+                                            } else {
+                                                Icons.Outlined.Search
+                                            },
+                                            contentDescription = stringResource(
+                                                if (tagSearchOpen) {
+                                                    R.string.common_close
+                                                } else {
+                                                    R.string.memo_filter_tag_search
+                                                }
+                                            ),
+                                            modifier = Modifier.size(MiuixTokens.IconSmall)
+                                        )
+                                    }
+                                    if (collapsibleTags.isNotEmpty()) {
+                                        val allCollapsed = collapsedTags.containsAll(collapsibleTags)
+                                        IconButton(onClick = {
+                                            collapsedTags = if (allCollapsed) emptySet() else collapsibleTags
+                                        }) {
+                                            Icon(
+                                                imageVector = if (allCollapsed) {
+                                                    Icons.Outlined.UnfoldMore
+                                                } else {
+                                                    Icons.Outlined.UnfoldLess
+                                                },
+                                                contentDescription = stringResource(
+                                                    if (allCollapsed) {
+                                                        R.string.tags_expand_all
+                                                    } else {
+                                                        R.string.tags_collapse_all
+                                                    }
+                                                ),
+                                                modifier = Modifier.size(MiuixTokens.IconSmall)
+                                            )
+                                        }
+                                    }
+                                }
+                            )
+                            // The AND/OR switch is a row of its own: as chips beside the heading it stole
+                            // the heading's line and left both looking cramped.
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 16.dp, end = 16.dp, top = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(preset.dateLabel())
+                                Text(
+                                    text = stringResource(R.string.memo_filter_tag_match),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                AppFilterChip(
+                                    selected = draft.tagMatch == TagMatch.ALL,
+                                    onClick = { draft = draft.copy(tagMatch = TagMatch.ALL) }
+                                ) {
+                                    Text(stringResource(R.string.memo_filter_tags_all))
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                AppFilterChip(
+                                    selected = draft.tagMatch == TagMatch.ANY,
+                                    onClick = { draft = draft.copy(tagMatch = TagMatch.ANY) }
+                                ) {
+                                    Text(stringResource(R.string.memo_filter_tags_any))
+                                }
                             }
                         }
-                        // The picked window becomes the chip's own label: the extra grey line that
-                        // used to spell it out below the row is gone.
-                        AppFilterChip(
-                            selected = customRange != null,
-                            onClick = { showDatePicker = true }
+                    }
+
+                    item(key = "tags-search") {
+                        // A permanent item whose content expands: inserting and removing the item itself
+                        // made the field pop open instead of growing.
+                        AnimatedVisibility(
+                            visible = tagSearchOpen,
+                            enter = expandVertically(animationSpec = tween(180)) + fadeIn(tween(120)),
+                            exit = shrinkVertically(animationSpec = tween(150)) + fadeOut(tween(100))
                         ) {
-                            Text(
-                                customRange?.chipLabel(zone)
-                                    ?: stringResource(R.string.memo_filter_date_custom)
+                            AppTextField(
+                                value = tagQuery,
+                                onValueChange = { tagQuery = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 16.dp, top = 8.dp, end = 16.dp),
+                                placeholder = stringResource(R.string.memo_filter_tag_search),
+                                singleLine = true,
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Search,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             )
                         }
                     }
-                }
-            }
 
-            item(key = "sort") {
-                Column(Modifier.padding(top = SectionGap)) {
-                    SectionHeader(stringResource(R.string.memo_filter_section_sort))
-                    ChipFlow {
-                        MemoSort.entries.forEach { sort ->
-                            AppFilterChip(
-                                selected = draft.sort == sort,
-                                onClick = { draft = draft.copy(sort = sort) }
-                            ) {
-                                Text(sort.sortLabel())
-                            }
+                    if (tagRows.isEmpty()) {
+                        item(key = "tags-empty") {
+                            Hint(
+                                if (treeCounts.isEmpty()) {
+                                    stringResource(R.string.memo_filter_no_tags)
+                                } else {
+                                    stringResource(R.string.memo_filter_no_match)
+                                }
+                            )
+                        }
+                    } else {
+                        items(tagRows, key = { "tag:${it.path}" }) { node ->
+                            TagTreeRow(
+                                node = node,
+                                selected = node.path in draft.tags,
+                                descendantSelected = hasSelectedDescendant(draft.tags, node.path),
+                                expanded = node.path !in collapsedTags,
+                                onToggleSelect = {
+                                    draft = draft.copy(
+                                        tags = if (node.path in draft.tags) {
+                                            draft.tags - node.path
+                                        } else {
+                                            draft.tags + node.path
+                                        }
+                                    )
+                                },
+                                onToggleExpand = {
+                                    collapsedTags = if (node.path in collapsedTags) {
+                                        collapsedTags - node.path
+                                    } else {
+                                        collapsedTags + node.path
+                                    }
+                                },
+                                // Folding a branch or filtering the list animates the rows into their new
+                                // places instead of re-drawing the pane.
+                                modifier = Modifier.animateItem()
+                            )
                         }
                     }
+
                 }
             }
         }
