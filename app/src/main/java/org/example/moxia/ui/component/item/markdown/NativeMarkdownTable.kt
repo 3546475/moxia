@@ -319,7 +319,13 @@ private fun Modifier.spanHostInset(insetStart: Dp, insetEnd: Dp) = layout { meas
     }
 }
 
-/** Fades one edge of a scrollable table into the table background. */
+/**
+ * Fades one edge of a scrollable table into the table background.
+ *
+ * The fade matches the table's own size instead of filling the incoming height: a host that caps
+ * the content height would otherwise let the fade claim that whole height, and the table would
+ * leave a blank strip below itself.
+ */
 @Composable
 private fun BoxScope.TableEdgeFade(alignment: Alignment, color: Color) {
     Box(
@@ -327,7 +333,7 @@ private fun BoxScope.TableEdgeFade(alignment: Alignment, color: Color) {
             .align(alignment)
             .padding(horizontal = 1.dp)
             .width(20.dp)
-            .fillMaxHeight()
+            .matchParentSize()
             .background(
                 Brush.horizontalGradient(
                     when (alignment) {
