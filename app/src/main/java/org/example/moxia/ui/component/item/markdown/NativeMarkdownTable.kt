@@ -166,6 +166,9 @@ fun NativeMarkdownTable(
         val maxCellWidth = with(density) { (maxWidth * 2).roundToPx() }
         Box(
             modifier = Modifier
+                // The frame never grows past the card: a table wider than the card scrolls
+                // inside the frame instead of pushing its border over the card's edge.
+                .width(with(density) { availableWidth.toDp() })
                 .clip(RoundedCornerShape(tableCornerSize))
                 .background(tableBackground)
                 .border(1.dp, lineColor, RoundedCornerShape(tableCornerSize))

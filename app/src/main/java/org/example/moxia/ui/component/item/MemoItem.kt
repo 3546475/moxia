@@ -185,6 +185,10 @@ fun MemoItem(
     val scope = rememberCoroutineScope()
     val pageColor = MaterialTheme.colorScheme.background
     val editGesture = LocalMemoEditGesture.current
+    // The card's content padding. A markdown table keeps an equal distance from both card edges,
+    // so it cannot simply reuse the text column's insets: the card's own padding is asymmetric.
+    val cardPaddingStart = 12.dp
+    val cardPaddingEnd = 4.dp
     // A queued write (create, edit, pin, archive, delete) for this memo has not been
     // acknowledged by the server yet. Name-based, so it also covers edits; the old check
     // only matched locally created memos whose name still carried OfflineMemoPrefix.
@@ -253,9 +257,9 @@ fun MemoItem(
                     }
                 )
                 .padding(
-                    start = 12.dp,
+                    start = cardPaddingStart,
                     top = if (user != null) 12.dp else 4.dp,
-                    end = 4.dp,
+                    end = cardPaddingEnd,
                     bottom = 12.dp
                 )
         ) {
@@ -553,6 +557,13 @@ fun MemoItem(
                     // card's content width instead of the narrower text column.
                     val textInsetStart = 12.dp
                     val textInsetEnd = 16.dp
+                    // The table's frame keeps the same distance from both card edges. Its bleed is
+                    // therefore measured from the card's edges: the table's left edge lines up
+                    // with the card's content column, and the right edge is pulled in by the
+                    // difference the card's asymmetric padding would otherwise create.
+                    val tableMargin = cardPaddingStart
+                    val tableBleedStart = textInsetStart + cardPaddingStart - tableMargin
+                    val tableBleedEnd = textInsetEnd + cardPaddingEnd - tableMargin
                     NativeComposeMarkdown(
                         content = memo.content,
                         token = token,
@@ -563,8 +574,8 @@ fun MemoItem(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(start = textInsetStart, end = textInsetEnd, bottom = 8.dp),
-                        bleedStart = textInsetStart,
-                        bleedEnd = textInsetEnd,
+                        bleedStart = tableBleedStart,
+                        bleedEnd = tableBleedEnd,
                         headerScale = headerScale
                     )
                 }
