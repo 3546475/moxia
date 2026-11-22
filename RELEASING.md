@@ -35,7 +35,7 @@
 - `small` —— `main` 去掉 Material 3 路径与样式切换（只剩 Miuix），跟随 `fork/small`；与 `main` 的冲突一律以 `small` 的单主题代码为准。
 - `cnb-main` —— 发布分支，跟随 `cnb/main`。CNB 侧的 `.cnb.yml` 在这里演进。
 
-标签：`vX.Y.Z`。**两端同名标签指向同一个提交**，各端自己构建。
+标签：`vX.Y.Z`。**两端同名标签指向同一个提交**，各端自己构建（`v1.0.0` 是例外，见 §12）。
 
 ---
 
@@ -152,7 +152,7 @@ git push fork main:main
 git tag -f vX.Y.Z <同一个提交> && git push --force fork vX.Y.Z
 ```
 
-流水线（`.github/workflows/release-build.yml`）：校验 tag → 算 `VC` → 单测 → `assembleRelease -PversionName -PversionCode` → `aapt2` 回读校验 → `softprops/action-gh-release@v2` 发布（同名 tag 会**替换**已有资产）→ 回写清单到 `main`。
+流水线（`.github/workflows/release-build.yml`）：校验 tag → 算 `VC` → `assembleRelease -PversionName -PversionCode` → `aapt2` 回读校验 → `softprops/action-gh-release@v2` 发布（同名 tag 会**替换**已有资产）→ 回写清单到 `main`。
 
 > GitHub 的 `v1.0.0` 已经存在且指向旧提交，所以同名标签必须 `--force`。这是有意的：两端同名标签指向同一提交，各自构建。
 
@@ -182,7 +182,7 @@ git tag -f vX.Y.Z <同一个提交> && git push --force fork vX.Y.Z
 | 3 | `.cnb.yml` + `app/build.gradle.kts` | `-PexcludeDockerTests=true` 过滤 `MemosApiIntegrationTest` / `ContainerTest` | 这两个类用 Testcontainers，runner 里没有 Docker daemon → 61 个用例失败，整条流水线挂掉 |
 | 4 | `.github/workflows/release-build.yml` 清单步骤 | 先 `git add update.json` 再 `git diff --cached --quiet` 判断 | 未跟踪的文件 `git diff` 看不见 → "manifest already current" 永远成立 → **清单永远没被提交**，兜底源 404 |
 | 5 | `.cnb.yml` SDK stage | `sdkmanager` 不可用时只提示、不 `exit 1` | 镜像里没有可用的 `sdkmanager`，硬校验会让流水线 1 秒内失败；平台交给 AGP 自己下载 |
-| 6 | 两端流水线 | 显式传 `-PversionCode` / `-PversionName`，并用 `aapt2` 回读校验 | Gradle 从 git 推断的版本可能与流水线发布的 tag 不一致 → 包与清单版本对不上 |
+| 6 | 两端流水线 | 都显式传 `-PversionCode` / `-PversionName`；GitHub 侧再用 `aapt2` 回读校验 | Gradle 从 git 推断的版本可能与流水线发布的 tag 不一致 → 包与清单版本对不上 |
 | 7 | `.cnb.yml` 清单步骤 | clone 后覆盖文件、`git add`、`git commit`、`git push` 全都显式写 | 只 clone 不提交，清单不会出现在 `main` 上 |
 
 ---
@@ -242,9 +242,19 @@ curl -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.cnb.api+json"
 
 ## 12. 发布记录
 
+### v1.0.1（2026-11-13）
+
+- 发布提交：tag `v1.0.1` = `1f047c1c`（两端同一提交）。
+- 清单提交：GitHub `1b51350b`，CNB `603fd490`。
+- 包尺寸（两端相同）：arm64-v8a 23393718 / armeabi-v7a 19194352 / universal 65001501。
+- 摘要（两端不同，证明独立构建）：
+  - arm64-v8a：GitHub `34957fac85818907dfa25ce96a449740eac21c90c80885ea00ee60dd2c7b005f` / CNB `a54841eaa815738a80eae09bf98dda81d8a10931f7a78e2351d409f494d0ad5b`
+  - armeabi-v7a：GitHub `ab4b0592706b7f07e0e3ffe935d2744710b89ddf65fa6402458e6fe43413fd4f` / CNB `61554072b10fc22fbf028e1fa9fd941e73388e9f802a212b669cb48c96ce2e4d`
+  - universal：GitHub `c548c65e87da9ed87979a42b197761e78e9ee42c4041eb654a51ef51507a6471` / CNB `cf9b24ff860d42afece2a41b27a6e4ede881c66a72e5cd0c32c1e4bba8af0f1a`
+
 ### v1.0.0（2026-11-12）
 
-- 发布提交：CNB `47a1c611`，GitHub `e588020c`（同一份发布内容，两端各自提交）。
+- 发布提交：CNB `47a1c611`、GitHub `e588020c`（`v1.0.0` 是例外：两端 tag 实际指向不同提交；`v1.0.1` 起按 §2 同提交执行）。
 - CNB 构建：`cnb-pcl-1k777hskj`，8 个 stage 全绿，构建耗时 10m42s。
 - 包尺寸（两端相同）：arm64-v8a 23339790 / armeabi-v7a 19140424 / universal 64947573。
 - 摘要（两端不同，证明独立构建）：
