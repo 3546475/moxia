@@ -18,6 +18,7 @@ import org.example.moxia.model.SetMemoRelationsRequest
 import org.example.moxia.model.Reaction
 import org.example.moxia.model.UpsertMemoReactionRequest
 import org.example.moxia.model.User
+import org.example.moxia.model.Visibility
 import retrofit2.HttpException
 
 private const val TAG = "OpReplayExecutor"
@@ -286,12 +287,23 @@ class OpReplayExecutor(
     }
 
     private suspend fun syncCommentCreate(op: PendingOp): Boolean {
-        val comment = gson.fromJson(op.payloadJson, Memo::class.java) ?: return true
+        var comment = gson.fromJson(op.payloadJson, Memo::class.java) ?: return true
+        val parentName = op.parentName ?: return true
+        // A comment queued before it carried its placement says SPACE without a space, which the
+        // server rejects. Recover the placement from the parent instead of losing the op.
+        if (comment.space == null && comment.visibility == Visibility.SPACE) {
+            val parent = api.getMemo(parentName)
+            if (parent.space == null) {
+                Log.w(TAG, "Comment op ${op.id} still has no space; parent $parentName is not placed")
+            } else {
+                comment = comment.copy(space = parent.space)
+            }
+        }
         // The op id doubles as the idempotency key (commentId): a replayed
         // comment create is then deduplicated by the server instead of
         // duplicating the comment. The API layer drops it on server versions
         // that reject client-supplied ids (v0.26/v0.27).
-        api.createMemoComment(op.parentName ?: return true, comment, commentId = op.id)
+        api.createMemoComment(parentName, comment, commentId = op.id)
         onCommentsRefresh()
         return true
     }

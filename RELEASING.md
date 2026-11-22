@@ -32,7 +32,7 @@
 本地分支：
 
 - `main` —— 两种设计语言（Material 3 / Miuix），跟随 `fork/main`。
-- `small` —— `main` 去掉 Miuix（单主题），跟随 `fork/small`；与 `main` 的冲突一律以 `small` 的单主题代码为准。
+- `small` —— `main` 去掉 Material 3 路径与样式切换（只剩 Miuix），跟随 `fork/small`；与 `main` 的冲突一律以 `small` 的单主题代码为准。
 - `cnb-main` —— 发布分支，跟随 `cnb/main`。CNB 侧的 `.cnb.yml` 在这里演进。
 
 标签：`vX.Y.Z`。**两端同名标签指向同一个提交**，各端自己构建。
