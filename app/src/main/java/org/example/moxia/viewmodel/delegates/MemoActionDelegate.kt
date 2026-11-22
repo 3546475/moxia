@@ -651,12 +651,13 @@ class MemoActionDelegateImpl(
         val wasOnline = connection.networkReady && isOnlineProvider()
         val accountId = context.account.id
         val parentName = parentMemo.name ?: return
-        // Audience and placement go together: a SPACE comment without its parent's space is
-        // rejected by the server, so the placement travels with the inherited visibility.
+        // Audience and placement go together only for SPACE: the server requires a placement
+        // there, while sending one for any other audience would demand space membership the
+        // comment does not need.
         val comment = Memo(
             content = content,
             visibility = parentMemo.visibility,
-            space = parentMemo.space,
+            space = parentMemo.space.takeIf { parentMemo.visibility == Visibility.SPACE },
             parent = parentName
         )
         val tempName = "offline-comment-${UUID.randomUUID()}"

@@ -210,6 +210,25 @@ class MemoEditorSubmissionTest {
         assertFalse("null space is not serialized", GsonProvider.gson.toJson(sent).contains("\"space\""))
     }
 
+    @Test fun `a non-SPACE comment drops a stale placement`() = runTest {
+        val fixture = Fixture(backgroundScope)
+        fixture.cacheWrite.complete(Unit)
+        var success = false
+        fixture.actions.createComment(
+            Memo(
+                name = "memos/parent",
+                content = "Parent",
+                visibility = Visibility.PRIVATE,
+                space = "spaces/old"
+            ),
+            "Saved",
+            onSuccess = { success = true }
+        )
+        runCurrent()
+        assertTrue(success)
+        assertNull(fixture.commentRequests.single().space)
+    }
+
     @Test fun `a queued space comment carries the parent placement`() = runTest {
         val fixture = Fixture(backgroundScope, online = false)
         val parent = Memo(
