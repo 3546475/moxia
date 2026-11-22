@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
+import org.example.moxia.api.GsonProvider
 import org.example.moxia.api.MemosApi
 import org.example.moxia.data.DataStoreManager
 import org.example.moxia.data.DraftManager
@@ -39,19 +40,24 @@ import org.junit.Test
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MemoEditorSubmissionTest {
-    private class Fixture(scope: CoroutineScope) {
+    private class Fixture(scope: CoroutineScope, online: Boolean = true) {
         var reject = false
         val cacheWrite = CompletableDeferred<Unit>()
         val stored = mutableListOf<CachedMemo>()
         val ops = linkedMapOf<String, PendingOp>()
         val enqueued = mutableListOf<PendingOp>()
-        val state = MutableStateFlow(MemosUiState(isOnline = true))
+        val commentRequests = mutableListOf<Memo>()
+        val state = MutableStateFlow(MemosUiState(isOnline = online))
         val sessions = AccountSession(scope)
-        val api = stub<MemosApi> { name, _ ->
+        val api = stub<MemosApi> { name, args ->
             if (reject) error("Server rejected $name")
             when (name) {
-                "createMemo", "updateMemo", "createMemoComment", "getMemo" ->
+                "createMemo", "updateMemo", "getMemo" ->
                     Memo(name = "memos/result", content = "Saved")
+                "createMemoComment" -> {
+                    commentRequests += args[1] as Memo
+                    Memo(name = "memos/result", content = "Saved")
+                }
                 else -> error(name)
             }
         }
@@ -95,7 +101,8 @@ class MemoEditorSubmissionTest {
             onMemoSynced = { _, _ -> }, onMemoDeleted = {}, onCommentsRefresh = {}, onConflict = {})
         val actions = MemoActionDelegateImpl(scope, state,
             stub<MemoListUpdater> { _, _ -> Unit }, stub<DraftDelegate> { _, _ -> Unit },
-            { null }, { null }, sync, cache, sessions, DraftManager(ContextWrapper(null)), { true })
+            { null }, { null }, sync, cache, sessions, DraftManager(ContextWrapper(null)),
+            { online }, notifyOfflineSaved = {})
     }
 
     @Test fun `create writes the memo locally and queues it without waiting for the server`() = runTest {
@@ -169,5 +176,77 @@ class MemoEditorSubmissionTest {
         assertTrue(failed)
         assertFalse(success)
         assertTrue(fixture.stored.isEmpty())
+    }
+
+    @Test fun `a space comment carries the parent placement`() = runTest {
+        val fixture = Fixture(backgroundScope)
+        fixture.cacheWrite.complete(Unit)
+        val parent = Memo(
+            name = "memos/parent",
+            content = "Parent",
+            visibility = Visibility.SPACE,
+            space = "spaces/one"
+        )
+        var success = false
+        fixture.actions.createComment(parent, "Saved", onSuccess = { success = true })
+        runCurrent()
+        assertTrue(success)
+        assertEquals("spaces/one", fixture.commentRequests.single().space)
+    }
+
+    @Test fun `a comment without a space parent stays without a space`() = runTest {
+        val fixture = Fixture(backgroundScope)
+        fixture.cacheWrite.complete(Unit)
+        var success = false
+        fixture.actions.createComment(
+            Memo(name = "memos/parent", content = "Parent", visibility = Visibility.PRIVATE),
+            "Saved",
+            onSuccess = { success = true }
+        )
+        runCurrent()
+        assertTrue(success)
+        val sent = fixture.commentRequests.single()
+        assertNull(sent.space)
+        assertFalse("null space is not serialized", GsonProvider.gson.toJson(sent).contains("\"space\""))
+    }
+
+    @Test fun `a non-SPACE comment drops a stale placement`() = runTest {
+        val fixture = Fixture(backgroundScope)
+        fixture.cacheWrite.complete(Unit)
+        var success = false
+        fixture.actions.createComment(
+            Memo(
+                name = "memos/parent",
+                content = "Parent",
+                visibility = Visibility.PRIVATE,
+                space = "spaces/old"
+            ),
+            "Saved",
+            onSuccess = { success = true }
+        )
+        runCurrent()
+        assertTrue(success)
+        assertNull(fixture.commentRequests.single().space)
+    }
+
+    @Test fun `a queued space comment carries the parent placement`() = runTest {
+        val fixture = Fixture(backgroundScope, online = false)
+        val parent = Memo(
+            name = "memos/parent",
+            content = "Parent",
+            visibility = Visibility.SPACE,
+            space = "spaces/one"
+        )
+        var success = false
+        fixture.actions.createComment(parent, "Saved", onSuccess = { success = true })
+        runCurrent()
+        assertFalse("the editor waits for the local write", success)
+        fixture.cacheWrite.complete(Unit)
+        runCurrent()
+        assertTrue(success)
+        assertTrue("the server is not called while offline", fixture.commentRequests.isEmpty())
+        val queued = GsonProvider.gson.fromJson(fixture.enqueued.single().payloadJson, Memo::class.java)
+        assertEquals("spaces/one", queued.space)
+        assertEquals(Visibility.SPACE, queued.visibility)
     }
 }
